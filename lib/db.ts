@@ -1,21 +1,30 @@
-// Dexie database setup
-// This will be implemented in Phase 1
+// Dexie database setup for local-first storage
 
-import Dexie from "dexie";
+import Dexie, { type EntityTable } from "dexie";
 import type { Feed, Article, SyncState } from "./types";
 
-// Database will be set up here
-// For now, this is a placeholder
-
 export class ClarifyDB extends Dexie {
-  // Tables will be defined here in Phase 1
-  feeds!: Dexie.Table<Feed, string>;
-  articles!: Dexie.Table<Article, string>;
-  syncState!: Dexie.Table<SyncState, string>;
+  feeds!: EntityTable<Feed, "id">;
+  articles!: EntityTable<Article, "id">;
+  syncState!: EntityTable<SyncState, "id">;
 
   constructor() {
     super("ClarifyRSS");
-    // Schema will be defined in Phase 1
+
+    // Define schema version 1
+    this.version(1).stores({
+      // Feeds table indexes
+      feeds: "id, url, isDeleted, updatedAt",
+
+      // Articles table indexes
+      // Primary key: id
+      // Indexes: feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt
+      articles:
+        "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted]",
+
+      // Sync state table (single row)
+      syncState: "id",
+    });
   }
 }
 
