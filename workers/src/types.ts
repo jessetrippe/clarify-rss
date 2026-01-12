@@ -1,0 +1,57 @@
+// Type definitions for Clarify RSS Worker
+
+export interface Env {
+  DB: D1Database;
+  ENVIRONMENT?: string;
+}
+
+export interface Feed {
+  id: string;
+  url: string;
+  title: string;
+  last_fetched_at?: number;
+  last_error?: string;
+  created_at: number;
+  updated_at: number;
+  is_deleted: number;
+}
+
+export interface Article {
+  id: string;
+  feed_id: string;
+  guid?: string;
+  url?: string;
+  title: string;
+  content?: string;
+  summary?: string;
+  published_at?: number;
+  is_read: number;
+  is_starred: number;
+  created_at: number;
+  updated_at: number;
+  is_deleted: number;
+}
+
+export interface SyncPullRequest {
+  cursor?: string;
+  limit?: number;
+}
+
+export interface SyncPullResponse {
+  feeds: Feed[];
+  articles: Article[];
+  cursor: string;
+  hasMore: boolean;
+}
+
+export interface SyncPushRequest {
+  feeds: Feed[];
+  articles: Article[];
+}
+
+export interface SyncPushResponse {
+  success: boolean;
+  feedsProcessed: number;
+  articlesProcessed: number;
+  conflicts: number;
+}
