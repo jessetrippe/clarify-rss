@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { addFeed, feedExists, addArticle } from "@/lib/db-operations";
-import { parseFeed, discoverFeeds } from "@/lib/feed-parser";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787";
 
 interface AddFeedFormProps {
   onSuccess?: () => void;
@@ -36,7 +37,17 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
 
       // Try to parse as feed
       try {
-        const feedData = await parseFeed(url);
+        const response = await fetch(`${API_URL}/api/feeds/parse`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to parse feed");
+        }
+
+        const feedData = await response.json();
 
         // Add feed to database
         const feed = await addFeed({
@@ -45,7 +56,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
         });
 
         // Add initial articles
-        const articlePromises = feedData.articles.map((article) =>
+        const articlePromises = feedData.articles.map((article: any) =>
           addArticle({
             feedId: feed.id,
             guid: article.guid,
@@ -53,7 +64,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
             title: article.title,
             content: article.content,
             summary: article.summary,
-            publishedAt: article.publishedAt,
+            publishedAt: article.publishedAt ? new Date(article.publishedAt) : undefined,
           })
         );
         await Promise.all(articlePromises);
@@ -65,7 +76,14 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
       } catch (parseError) {
         // Feed parsing failed, try auto-discovery
         console.log("Feed parsing failed, attempting discovery...", parseError);
-        const discovered = await discoverFeeds(url);
+
+        const discoverResponse = await fetch(`${API_URL}/api/feeds/discover`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const discoverData = await discoverResponse.json();
+        const discovered = discoverData.feeds || [];
 
         if (discovered.length > 0) {
           setDiscoveredFeeds(discovered);
@@ -140,11 +158,6 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
           {isLoading ? "Adding Feed..." : "Add Feed"}
         </button>
       </form>
-
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-        Note: Using mock feed parser. Real RSS parsing will be implemented in
-        Phase 5.
-      </p>
     </div>
   );
 }
