@@ -1,6 +1,7 @@
 // Clarify RSS Sync API Worker
 
 import { syncPull, syncPush } from "./sync";
+import { fetchAndParseFeed, discoverFeeds } from "./feed-fetcher";
 import type { Env, SyncPullRequest, SyncPushRequest } from "./types";
 
 // CORS headers for cross-origin requests
@@ -68,6 +69,33 @@ export default {
         return jsonResponse({ status: "ok", timestamp: Date.now() });
       }
 
+      // Route: POST /api/feeds/parse (parse RSS feed)
+      if (url.pathname === "/api/feeds/parse" && request.method === "POST") {
+        const body = (await request.json()) as { url: string };
+        if (!body.url) {
+          return errorResponse("URL required", 400);
+        }
+        try {
+          const feedData = await fetchAndParseFeed(body.url);
+          return jsonResponse(feedData);
+        } catch (error) {
+          return errorResponse(
+            error instanceof Error ? error.message : "Failed to parse feed",
+            400
+          );
+        }
+      }
+
+      // Route: POST /api/feeds/discover (discover feeds from URL)
+      if (url.pathname === "/api/feeds/discover" && request.method === "POST") {
+        const body = (await request.json()) as { url: string };
+        if (!body.url) {
+          return errorResponse("URL required", 400);
+        }
+        const feeds = await discoverFeeds(body.url);
+        return jsonResponse({ feeds });
+      }
+
       // Route: GET / (root)
       if (url.pathname === "/" && request.method === "GET") {
         return jsonResponse({
@@ -76,6 +104,8 @@ export default {
           endpoints: [
             "POST /api/sync/pull",
             "POST /api/sync/push",
+            "POST /api/feeds/parse",
+            "POST /api/feeds/discover",
             "GET /api/health",
           ],
         });
