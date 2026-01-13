@@ -18,7 +18,7 @@ import { copyArticleContent } from "@/lib/copy-content";
 export default function ArticleDetail() {
   const params = useParams();
   const router = useRouter();
-  const articleId = params.id as string;
+  const articleId = decodeURIComponent(params.id as string);
 
   const [article, setArticle] = useState<Article | null>(null);
   const [feed, setFeed] = useState<Feed | null>(null);

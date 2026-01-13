@@ -29,7 +29,7 @@ export default function ArticleList({
       {articles.map((article) => (
         <Link
           key={article.id}
-          href={`/articles/${article.id}`}
+          href={`/articles/${encodeURIComponent(article.id)}`}
           className="block border border-gray-300 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
         >
           <div className="flex items-start justify-between gap-4">

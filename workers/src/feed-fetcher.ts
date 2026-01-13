@@ -23,20 +23,36 @@ export interface ParsedArticle {
   publishedAt?: Date;
 }
 
+async function fetchFeedText(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Clarify RSS/1.0",
+      Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+    },
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return response.text();
+}
+
 /**
  * Fetch and parse an RSS/Atom feed
  */
 export async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
   try {
-    // Fetch and parse feed
-    const feed = await parser.parseURL(url);
+    const xml = await fetchFeedText(url);
+    const feed = await parser.parseString(xml);
 
     // Extract articles
     const articles: ParsedArticle[] = feed.items.map((item) => ({
       guid: item.guid || item.id,
       url: item.link,
       title: item.title || "Untitled",
-      content: item.content || item["content:encoded"],
+      content: item.content || (item as { "content:encoded"?: string })["content:encoded"],
       summary: item.contentSnippet || item.summary,
       publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
     }));
@@ -48,7 +64,9 @@ export async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
     };
   } catch (error) {
     console.error("Feed parsing error:", error);
-    throw new Error(`Failed to parse feed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    throw new Error(
+      `Failed to parse feed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
   }
 }
 
@@ -77,10 +95,10 @@ export async function discoverFeeds(url: string): Promise<string[]> {
 
     let match;
     while ((match = linkRegex.exec(html)) !== null) {
-      feeds.push(match[2]);
+      feeds.push(new URL(match[2], url).toString());
     }
     while ((match = linkRegex2.exec(html)) !== null) {
-      feeds.push(match[2]);
+      feeds.push(new URL(match[2], url).toString());
     }
 
     // Try common feed URLs if nothing found

@@ -1,27 +1,18 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+import type { Metadata, Viewport } from "next";
 import SyncProvider from "@/components/SyncProvider";
 import OfflineIndicator from "@/components/OfflineIndicator";
-import InstallPrompt from "@/components/InstallPrompt";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import Sidebar from "@/components/Sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Clarify RSS",
   description: "A personal, plaintext RSS reader focused on reading and copying article content",
   manifest: "/manifest.json",
-  themeColor: "#3b82f6",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Clarify",
-  },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-    viewportFit: "cover",
   },
   icons: {
     icon: [
@@ -32,6 +23,15 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
+  themeColor: "#3b82f6",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -39,41 +39,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col">
+      <body className="min-h-screen">
         <ErrorBoundary>
           <SyncProvider>
             <OfflineIndicator />
-            <InstallPrompt />
-            <header className="border-b border-gray-200 dark:border-gray-800">
-              <nav className="container mx-auto px-4 py-4">
-                <div className="flex items-center justify-between">
-                  <Link href="/" className="text-xl font-bold">
-                    Clarify
-                  </Link>
-                  <div className="flex gap-4">
-                    <Link
-                      href="/"
-                      className="text-sm hover:text-gray-600 dark:hover:text-gray-400"
-                    >
-                      All Items
-                    </Link>
-                    <Link
-                      href="/starred"
-                      className="text-sm hover:text-gray-600 dark:hover:text-gray-400"
-                    >
-                      Starred
-                    </Link>
-                    <Link
-                      href="/feeds"
-                      className="text-sm hover:text-gray-600 dark:hover:text-gray-400"
-                    >
-                      Feeds
-                    </Link>
-                  </div>
-                </div>
-              </nav>
-            </header>
-            <main className="flex-1 container mx-auto px-4 py-8">{children}</main>
+            <div className="flex min-h-screen">
+              <Sidebar />
+              <main className="flex-1 px-6 py-8">{children}</main>
+            </div>
           </SyncProvider>
         </ErrorBoundary>
       </body>

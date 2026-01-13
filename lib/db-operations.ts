@@ -12,7 +12,10 @@ import { generateArticleId } from "./article-id";
  * Get all feeds (excluding deleted)
  */
 export async function getAllFeeds(): Promise<Feed[]> {
-  return db.feeds.where("isDeleted").equals(0).sortBy("title");
+  const feeds = await db.feeds.toArray();
+  return feeds
+    .filter((feed) => !feed.isDeleted)
+    .sort((a, b) => (a.title || "").localeCompare(b.title || ""));
 }
 
 /**
@@ -92,44 +95,56 @@ export async function feedExists(url: string): Promise<boolean> {
  * Get all articles (excluding deleted), sorted by published date (newest first)
  */
 export async function getAllArticles(): Promise<Article[]> {
-  return db.articles
-    .where("isDeleted")
-    .equals(0)
-    .reverse()
-    .sortBy("publishedAt");
+  const articles = await db.articles.toArray();
+  return articles
+    .filter((article) => !article.isDeleted)
+    .sort((a, b) => {
+      const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
+      const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
+      return bTime - aTime;
+    });
 }
 
 /**
  * Get articles by feed ID
  */
 export async function getArticlesByFeed(feedId: string): Promise<Article[]> {
-  return db.articles
-    .where("[feedId+isDeleted]")
-    .equals([feedId, 0])
-    .reverse()
-    .sortBy("publishedAt");
+  const articles = await db.articles.toArray();
+  return articles
+    .filter((article) => article.feedId === feedId && !article.isDeleted)
+    .sort((a, b) => {
+      const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
+      const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
+      return bTime - aTime;
+    });
 }
 
 /**
  * Get starred articles
  */
 export async function getStarredArticles(): Promise<Article[]> {
-  return db.articles
-    .where("[isStarred+isDeleted]")
-    .equals([1, 0])
-    .reverse()
-    .sortBy("publishedAt");
+  const articles = await db.articles.toArray();
+  return articles
+    .filter((article) => article.isStarred && !article.isDeleted)
+    .sort((a, b) => {
+      const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
+      const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
+      return bTime - aTime;
+    });
 }
 
 /**
  * Get unread articles
  */
 export async function getUnreadArticles(): Promise<Article[]> {
-  return db.articles
-    .where("[isRead+isDeleted]")
-    .equals([0, 0])
-    .reverse()
-    .sortBy("publishedAt");
+  const articles = await db.articles.toArray();
+  return articles
+    .filter((article) => !article.isRead && !article.isDeleted)
+    .sort((a, b) => {
+      const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
+      const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
+      return bTime - aTime;
+    });
 }
 
 /**
@@ -318,13 +333,19 @@ export async function updateSyncState(params: {
  * Get counts for dashboard/stats
  */
 export async function getCounts() {
-  const [totalFeeds, totalArticles, unreadCount, starredCount] =
-    await Promise.all([
-      db.feeds.where("isDeleted").equals(0).count(),
-      db.articles.where("isDeleted").equals(0).count(),
-      db.articles.where("[isRead+isDeleted]").equals([0, 0]).count(),
-      db.articles.where("[isStarred+isDeleted]").equals([1, 0]).count(),
-    ]);
+  const [feeds, articles] = await Promise.all([
+    db.feeds.toArray(),
+    db.articles.toArray(),
+  ]);
+
+  const totalFeeds = feeds.filter((feed) => !feed.isDeleted).length;
+  const totalArticles = articles.filter((article) => !article.isDeleted).length;
+  const unreadCount = articles.filter(
+    (article) => !article.isRead && !article.isDeleted
+  ).length;
+  const starredCount = articles.filter(
+    (article) => article.isStarred && !article.isDeleted
+  ).length;
 
   return {
     totalFeeds,
