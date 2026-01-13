@@ -1,11 +1,159 @@
 # Clarify RSS - Project Implementation Plan
 
 **Project:** Clarify RSS - Personal, plaintext RSS reader
-**PRD:** `clarify-rss-PRD.md`
 **Created:** 2026-01-12
 **Status:** Planning
 
 ---
+
+## Product Scope
+
+### Problem Statement
+
+Many RSS readers (including high-quality native apps) display full feed-provided article text but do not reliably allow users to copy or export that text—especially on mobile. Long-form RSS articles are often difficult or impossible to “Select All,” creating friction for workflows that involve summarization, annotation, or reuse (e.g., pasting into ChatGPT).
+
+Clarify RSS is designed to solve this problem by providing:
+
+- Guaranteed access to full article content
+- A deterministic **Copy Content** action
+- A local-first, synced experience across iPhone and desktop
+- A minimal, durable feature set comparable to the _core_ functionality of Reeder Classic
+
+### Goals (MVP)
+
+- Subscribe to RSS/Atom feeds
+- Fetch, store, and display feed items
+- Persist article content locally
+- Track read/unread status
+- Support starring articles
+- Sync feeds, items, and state across devices
+- Provide a one-tap **Copy Content** action
+- Work offline after initial sync
+- Refresh feeds automatically when the app is opened or focused
+- Remain cheap or free to operate
+
+### Non-Goals (MVP)
+
+- Multi-user support or account management
+- Full article extraction from source websites (accept feed-provided content only)
+- Background/scheduled feed refresh (only on app open/focus)
+- Feed folders or hierarchical organization
+- Feed tags or categories
+- Article time-based retention limits (keep indefinitely)
+- Search functionality
+- Article filtering or sorting options beyond chronological
+- Social features or sharing capabilities
+- Feed recommendations or discovery features
+- Analytics or usage tracking
+- Image proxying or caching
+- Custom themes or appearance settings
+
+### Feature Scope (MVP)
+
+#### Feed Management
+
+- User can add a feed by entering a feed URL
+- Feed auto-discovery:
+  - When adding a feed, attempt to parse HTML for `<link rel="alternate">`
+  - If multiple feeds found, prompt user to choose
+  - Support common feed URL patterns (/feed, /rss, /atom.xml)
+- User can import feeds via OPML
+- User can export all feeds as OPML file
+- Feeds are persisted locally and synced
+- Feed metadata stored:
+  - URL
+  - Title
+  - Last fetched timestamp
+  - Last error (if any)
+
+#### Feed Refresh Behavior
+
+- Feeds refresh automatically:
+  - On app open
+  - When app regains focus
+- Refreshing a feed:
+  - Inserts new items
+  - Updates existing items
+  - Never overwrites user state (read/starred)
+- Rate limiting:
+  - Respect feed-level cache headers (ETag, Last-Modified)
+  - Minimum 5-minute interval between refreshes per feed
+  - Cloudflare Workers handle conditional GET requests
+- Error handling:
+  - Feed fetch failures show error message with last successful fetch time
+  - Retry on next manual refresh
+  - Invalid feeds show "Unable to parse" error
+
+#### Article Storage & Identity
+
+- All fetched articles are stored locally
+- Article identity resolution:
+  1. GUID (preferred)
+  2. Link URL
+  3. Hash of (feedId + title + publishedAt)
+- Duplicate articles are not created across refreshes
+- Article content handling:
+  - Articles store whatever content the RSS/Atom feed provides
+  - No additional web scraping or content extraction
+  - If a feed only provides summaries, that's what gets stored
+  - HTML content is persisted locally when provided by the feed
+- Image handling:
+  - Images use original URLs from feeds (not proxied or cached)
+  - Images render with `loading="lazy"` for performance
+  - No retention limit on articles (stored indefinitely)
+
+#### Read / Unread State
+
+- Articles default to **Unread**
+- Opening an article marks it **Read**
+- User can manually toggle Read / Unread
+- Read state persists locally and syncs
+
+#### Starred Articles
+
+- User can Star / Unstar an article
+- Starred state persists locally and syncs
+- A **Starred** view shows only starred items, sorted by date
+
+#### Article Display
+
+- Article detail view displays:
+  - Title
+  - Feed name
+  - Publication date (if available)
+  - Article body when provided by the feed
+- If no article body exists, show a fallback (summary or title + link)
+
+#### Copy Content (Critical Feature)
+
+- Article detail view includes a **Copy Content** button
+- Copy action places the following on the clipboard:
+  - Article Title
+  - Source URL
+  - Plain-text article body
+- HTML is converted to plain text deterministically
+- Copy works reliably for very long articles
+- Copy is always initiated by a direct user gesture (button tap)
+
+#### Sync Requirements (MVP)
+
+- Local-first
+- Backend stores canonical state
+- Client syncs on app open and app focus
+
+Data to sync:
+- Feeds
+- Items
+- Read/unread state
+- Starred state
+- Deletions (via tombstones)
+
+Conflict resolution:
+- **Last write wins**, based on `updatedAt` timestamps
+- Example: If starred state changes on two devices while offline, the most recent change (by timestamp) takes precedence when both sync
+- Tombstone cleanup: Never purge deleted items (kept indefinitely for sync integrity)
+- Sync batch size: 100 items per sync request
+- No limit on number of synced devices (designed for personal use across 2+ devices)
 
 ## Overview
 
@@ -473,7 +621,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    - Configure next-pwa in `next.config.js`
    - Cache strategy: NetworkFirst for API, CacheFirst for static assets
    - Precache app shell
-   - Cache feed icons/images opportunistically
+   - Rely on standard HTTP caching for feed images (no explicit caching)
 
 2. **Web App Manifest** (`public/manifest.json`)
    - App name: "Clarify RSS"
@@ -514,7 +662,6 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    - Test on iOS Safari (Add to Home Screen)
    - Test on desktop Chrome (Install App)
    - Test offline mode
-   - Test background sync (if device supports it)
    - Test across Mac and iPhone
 
 ### Deliverables
@@ -578,7 +725,6 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    - Consistent spacing and typography
    - Smooth transitions for state changes
    - Touch-friendly tap targets (min 44x44px)
-   - Dark mode support (optional, nice-to-have)
    - Favicon and app icon finalized
 
 7. **Error messages**
@@ -626,6 +772,39 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 - Commit: `"chore: production deployment and final polish"`
 - Tag: `v1.0.0`
+
+---
+
+## Phase 8: Dark Mode & Theming
+
+**Goal:** Add dark mode after core functionality is stable
+**Estimated Sessions:** 1-2
+**Dependencies:** Phase 7
+
+### Tasks
+
+1. **Theme tokens**
+   - Define light/dark CSS variables
+   - Ensure contrast meets accessibility targets
+
+2. **Theme selection**
+   - Default to system preference
+   - Allow manual override (persist locally)
+
+3. **UI validation**
+   - Verify all screens in dark mode
+   - Check article content readability
+   - Validate icons/illustrations render correctly
+
+### Deliverables
+
+- ✅ Dark mode available across the app
+- ✅ Theme preference persists locally
+- ✅ Accessibility contrast targets met
+
+### Checkpoint
+
+- Commit: `"feat: dark mode theme support"`
 
 ---
 

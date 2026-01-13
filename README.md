@@ -6,7 +6,7 @@ A personal, plaintext RSS reader - PWA with local-first sync.
 
 🚧 **In Development** - Phase 0 Complete
 
-See [PROJECT-PLAN.md](./PROJECT-PLAN.md) for implementation roadmap.
+See [PROJECT-PLAN.md](./PROJECT-PLAN.md) for product scope and implementation roadmap.
 
 ## Features (Planned)
 
@@ -59,8 +59,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Documentation
 
-- [PRD](./clarify-rss-PRD.md) - Product Requirements Document
-- [Project Plan](./PROJECT-PLAN.md) - Implementation roadmap
+- [Project Plan](./PROJECT-PLAN.md) - Product scope and implementation roadmap
+- [Testing Guide](./TESTING.md) - Manual testing steps and checklists
 
 ## License
 
