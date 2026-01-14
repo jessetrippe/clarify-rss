@@ -1,7 +1,7 @@
 # Clarify RSS - Testing Guide
 
-**Version:** 2.0 (Phases 0-6 Complete)  
-**Last Updated:** 2026-01-12
+**Version:** 2.1 (Phases 0-6 Complete)  
+**Last Updated:** 2026-01-13
 
 This comprehensive guide covers testing for all implemented features. Choose your testing approach:
 
@@ -32,7 +32,7 @@ Wait for: `Ready on http://localhost:3000`
 ### 2. Basic Smoke Test
 
 1. Open http://localhost:3000
-2. Go to "Feeds" page
+2. Go to "Settings" page
 3. Add a real RSS feed: `https://feeds.arstechnica.com/arstechnica/index`
 4. Wait for feed to parse (5-10 seconds)
 5. Click on the feed to see articles
@@ -101,25 +101,25 @@ Choose which areas to test:
 
 **Goal:** Verify feed CRUD operations
 
-### Add Feed (Mock Data)
+### Add Feed (Real Data)
 
-1. Go to "Feeds" page
+1. Go to "Settings" page
 2. Enter URL: `https://example.com/feed`
 3. Click "Add Feed"
 
-**Success:** Feed appears with mock title.
+**Success:** Feed appears with real title.
 
 ### View Feed
 
 1. Click on the feed
-2. Should see mock articles
+2. Should see real articles
 
 **Success:** Feed detail page shows articles list.
 
 ### Delete Feed
 
-1. On feed detail page, click "Delete Feed"
-2. Redirected to feeds page
+1. On Settings page, click "Delete" for the feed
+2. Feed disappears from the list
 3. Feed no longer in list
 
 **Success:** Feed removed from database.
@@ -127,7 +127,7 @@ Choose which areas to test:
 ### OPML Import
 
 1. Create test OPML file with 2-3 feed URLs
-2. Go to "Feeds" page
+2. Go to "Settings" page
 3. Click "Import OPML"
 4. Select file
 5. Progress shows for each feed
@@ -262,7 +262,7 @@ curl http://localhost:8787/api/health
 
 ### Add Real RSS Feed
 
-1. Go to "Feeds" page
+1. Go to "Settings" page
 2. Enter: `https://feeds.arstechnica.com/arstechnica/index`
 3. Click "Add Feed"
 4. Loading spinner appears
@@ -320,7 +320,7 @@ Try these:
 1. Open article from real feed
 2. Click "Copy Content"
 3. Paste into text editor
-4. Verify real content (not mocks)
+4. Verify real content (not mock data)
 
 **Success:** Real article content copied correctly.
 
@@ -469,7 +469,7 @@ These components are available for use but need to be wired into pages:
    - Theme: #3b82f6
    - Display: standalone
    - Icons: 192x192, 512x512
-   - Shortcuts: All Items, Starred, Feeds
+   - Shortcuts: All Items, Starred, Settings
 
 **Success:** Manifest configured correctly.
 
@@ -601,7 +601,7 @@ npm run dev
 - [ ] Visible in IndexedDB DevTools
 
 ### Phase 2: Feed Management ✓
-- [ ] Can add feed (mock)
+- [ ] Can add feed (real parse)
 - [ ] Can view feed detail
 - [ ] Can delete feed
 - [ ] OPML import works

@@ -2,9 +2,20 @@
 
 **Project:** Clarify RSS - Personal, plaintext RSS reader
 **Created:** 2026-01-12
-**Status:** Planning
+**Status:** In Development (Phases 0-6 implemented; Phase 7 pending)
 
 ---
+
+## Progress Update (2026-01-13)
+
+- Two-pane split layout with sidebar navigation and list/detail views
+- Settings moved to `/settings` with feeds management inside
+- Feed parsing/discovery handled by backend Worker (mock parser removed)
+- Per-list Unread/All toggle with persistence
+- Feed icons supported (feed-provided icon or favicon fallback)
+- Heroicons added for consistent UI icons
+- Local DB flags stored as numeric 0/1 with migration
+- Next.js 16 and Tailwind CSS 4 upgrades complete
 
 ## Product Scope
 
@@ -201,6 +212,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    /app
      /layout.tsx
      /page.tsx
+     /settings
      /feeds
      /articles
    /lib
@@ -245,11 +257,12 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
      id: string           // UUID
      url: string
      title: string
+     iconUrl?: string
      lastFetchedAt?: Date
      lastError?: string
      createdAt: Date
      updatedAt: Date
-     isDeleted: boolean
+     isDeleted: number    // 0 or 1
    }
 
    interface Article {
@@ -261,11 +274,11 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
      content?: string     // HTML
      summary?: string
      publishedAt?: Date
-     isRead: boolean
-     isStarred: boolean
+     isRead: number       // 0 or 1
+     isStarred: number    // 0 or 1
      createdAt: Date
      updatedAt: Date
-     isDeleted: boolean
+     isDeleted: number    // 0 or 1
    }
 
    interface SyncState {
@@ -323,7 +336,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ### Tasks
 
-1. **Feed list page** (`app/feeds/page.tsx`)
+1. **Settings page** (`app/settings/page.tsx`)
    - Display all feeds
    - Show feed title, last fetched time
    - Show error state if last fetch failed
@@ -332,19 +345,17 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 2. **Add feed form** (`components/AddFeedForm.tsx`)
    - Input for feed URL
    - Basic URL validation
-   - Submit handler (mock feed fetch for now)
+   - Submit handler (backend RSS parse + discovery)
    - Success/error feedback
 
-3. **Feed parsing utility** (`lib/feed-parser.ts`)
-   - For now, create mock parser that accepts URL
-   - Returns fake feed data (title, sample articles)
-   - Real RSS parsing comes in Phase 5
+3. **Feed parsing**
+   - Use backend Worker endpoints for parsing and discovery
 
 4. **OPML import** (`components/OPMLImport.tsx`)
    - File input for OPML file
    - Parse OPML XML (use DOMParser)
    - Extract feed URLs
-   - Bulk insert feeds into database
+   - Bulk insert feeds into database using backend parse/discovery
 
 5. **OPML export** (`lib/opml-export.ts`)
    - Generate OPML XML from feeds
@@ -352,9 +363,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    - Include feed title and URL
 
 6. **Feed detail view** (`app/feeds/[id]/page.tsx`)
-   - Show feed metadata
    - List articles from this feed
-   - Option to delete feed (soft delete)
 
 ### Deliverables
 
@@ -409,7 +418,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    - Add `loading="lazy"` to images
    - Add `rel="noopener noreferrer"` to links
 
-6. **Article actions** (`components/ArticleActions.tsx`)
+6. **Article actions** (integrated in detail view)
    - Star/Unstar button
    - Mark Read/Unread button
    - Copy Content button (see next section)
@@ -588,8 +597,8 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    - Or: call refresh endpoint separately after sync
    - Show "Refreshing feeds..." indicator
 
-8. **Replace mock feed parser**
-   - Update frontend AddFeedForm to call backend
+8. **Frontend parsing integration**
+   - Add Feed form and OPML import call backend parse/discovery
    - Handle feed discovery (if multiple feeds found, let user choose)
    - Show validation errors
 
