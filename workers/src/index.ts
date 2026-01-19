@@ -40,7 +40,7 @@ function errorResponse(message: string, status = 500): Response {
   return jsonResponse({ error: message }, status);
 }
 
-export default {
+const handler = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
@@ -121,3 +121,5 @@ export default {
     }
   },
 };
+
+export default handler;

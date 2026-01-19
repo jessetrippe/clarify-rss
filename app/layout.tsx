@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import SyncProvider from "@/components/SyncProvider";
 import OfflineIndicator from "@/components/OfflineIndicator";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import Sidebar from "@/components/Sidebar";
+import { MobileMenuProvider } from "@/components/MobileMenuProvider";
+import LayoutShell from "@/components/LayoutShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -43,10 +44,9 @@ export default function RootLayout({
         <ErrorBoundary>
           <SyncProvider>
             <OfflineIndicator />
-            <div className="flex min-h-screen">
-              <Sidebar />
-              <main className="flex-1 px-6 py-8">{children}</main>
-            </div>
+            <MobileMenuProvider>
+              <LayoutShell>{children}</LayoutShell>
+            </MobileMenuProvider>
           </SyncProvider>
         </ErrorBoundary>
       </body>

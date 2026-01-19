@@ -54,12 +54,19 @@ export async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
       title: item.title || "Untitled",
       content: item.content || (item as { "content:encoded"?: string })["content:encoded"],
       summary: item.contentSnippet || item.summary,
-      publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+      publishedAt: item.pubDate
+        ? new Date(item.pubDate)
+        : item.isoDate
+          ? new Date(item.isoDate)
+          : undefined,
     }));
+
+    const iconUrl = resolveFeedIconUrl(feed, url);
 
     return {
       title: feed.title || url,
       url,
+      iconUrl,
       articles,
     };
   } catch (error) {
@@ -67,6 +74,24 @@ export async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
     throw new Error(
       `Failed to parse feed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
+  }
+}
+
+function resolveFeedIconUrl(feed: any, url: string): string | undefined {
+  const rawIcon = feed.image?.url || feed.icon || feed.logo;
+  if (rawIcon) {
+    try {
+      return new URL(rawIcon, url).toString();
+    } catch {
+      return rawIcon;
+    }
+  }
+
+  try {
+    const origin = new URL(feed.link || url).origin;
+    return `${origin}/favicon.ico`;
+  } catch {
+    return undefined;
   }
 }
 

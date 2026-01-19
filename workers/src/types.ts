@@ -34,13 +34,16 @@ export interface Article {
 
 export interface SyncPullRequest {
   cursor?: string;
+  feedCursor?: string;
+  articleCursor?: string;
   limit?: number;
 }
 
 export interface SyncPullResponse {
   feeds: Feed[];
   articles: Article[];
-  cursor: string;
+  feedCursor: string;
+  articleCursor: string;
   hasMore: boolean;
 }
 

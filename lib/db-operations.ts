@@ -12,10 +12,7 @@ import { generateArticleId } from "./article-id";
  * Get all feeds (excluding deleted)
  */
 export async function getAllFeeds(): Promise<Feed[]> {
-  const feeds = await db.feeds.toArray();
-  return feeds
-    .filter((feed) => !feed.isDeleted)
-    .sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  return db.feeds.where("isDeleted").equals(0).sortBy("title");
 }
 
 /**
@@ -26,20 +23,29 @@ export async function getFeedById(id: string): Promise<Feed | undefined> {
 }
 
 /**
+ * Get a single feed by URL
+ */
+export async function getFeedByUrl(url: string): Promise<Feed | undefined> {
+  return db.feeds.where("url").equals(url).first();
+}
+
+/**
  * Add a new feed
  */
 export async function addFeed(params: {
   url: string;
   title: string;
+  iconUrl?: string;
 }): Promise<Feed> {
   const now = new Date();
   const feed: Feed = {
     id: crypto.randomUUID(),
     url: params.url,
     title: params.title,
+    iconUrl: params.iconUrl,
     createdAt: now,
     updatedAt: now,
-    isDeleted: false,
+    isDeleted: 0,
   };
 
   await db.feeds.add(feed);
@@ -63,29 +69,20 @@ export async function updateFeed(
  * Delete a feed (soft delete)
  */
 export async function deleteFeed(id: string): Promise<void> {
+  const now = new Date();
   await db.feeds.update(id, {
-    isDeleted: true,
-    updatedAt: new Date(),
+    isDeleted: 1,
+    updatedAt: now,
   });
 
   // Also soft delete all articles from this feed
-  const articles = await db.articles.where("feedId").equals(id).toArray();
-  const updates = articles.map((article) =>
-    db.articles.update(article.id, {
-      isDeleted: true,
-      updatedAt: new Date(),
-    })
-  );
-  await Promise.all(updates);
+  await db.articles.where("feedId").equals(id).modify({
+    isDeleted: 1,
+    updatedAt: now,
+  });
 }
 
-/**
- * Check if a feed URL already exists
- */
-export async function feedExists(url: string): Promise<boolean> {
-  const count = await db.feeds.where("url").equals(url).count();
-  return count > 0;
-}
+// feedExists removed - use getFeedByUrl instead
 
 // ============================================================================
 // ARTICLE OPERATIONS
@@ -95,57 +92,37 @@ export async function feedExists(url: string): Promise<boolean> {
  * Get all articles (excluding deleted), sorted by published date (newest first)
  */
 export async function getAllArticles(): Promise<Article[]> {
-  const articles = await db.articles.toArray();
-  return articles
-    .filter((article) => !article.isDeleted)
-    .sort((a, b) => {
-      const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
-      const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
-      return bTime - aTime;
-    });
+  return db.articles
+    .where("isDeleted")
+    .equals(0)
+    .reverse()
+    .sortBy("publishedAt");
 }
 
 /**
  * Get articles by feed ID
  */
 export async function getArticlesByFeed(feedId: string): Promise<Article[]> {
-  const articles = await db.articles.toArray();
-  return articles
-    .filter((article) => article.feedId === feedId && !article.isDeleted)
-    .sort((a, b) => {
-      const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
-      const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
-      return bTime - aTime;
-    });
+  if (!feedId) return [];
+  return db.articles
+    .where("[feedId+isDeleted]")
+    .equals([feedId, 0])
+    .reverse()
+    .sortBy("publishedAt");
 }
 
 /**
  * Get starred articles
  */
 export async function getStarredArticles(): Promise<Article[]> {
-  const articles = await db.articles.toArray();
-  return articles
-    .filter((article) => article.isStarred && !article.isDeleted)
-    .sort((a, b) => {
-      const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
-      const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
-      return bTime - aTime;
-    });
+  return db.articles
+    .where("[isStarred+isDeleted]")
+    .equals([1, 0])
+    .reverse()
+    .sortBy("publishedAt");
 }
 
-/**
- * Get unread articles
- */
-export async function getUnreadArticles(): Promise<Article[]> {
-  const articles = await db.articles.toArray();
-  return articles
-    .filter((article) => !article.isRead && !article.isDeleted)
-    .sort((a, b) => {
-      const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
-      const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
-      return bTime - aTime;
-    });
-}
+// getUnreadArticles removed - use getAllArticles and filter in component
 
 /**
  * Get a single article by ID
@@ -204,11 +181,11 @@ export async function addArticle(params: {
     content: params.content,
     summary: params.summary,
     publishedAt: params.publishedAt,
-    isRead: false,
-    isStarred: false,
+    isRead: 0,
+    isStarred: 0,
     createdAt: now,
     updatedAt: now,
-    isDeleted: false,
+    isDeleted: 0,
   };
 
   await db.articles.add(article);
@@ -220,29 +197,21 @@ export async function addArticle(params: {
  */
 export async function markArticleRead(id: string): Promise<void> {
   await db.articles.update(id, {
-    isRead: true,
+    isRead: 1,
     updatedAt: new Date(),
   });
 }
 
-/**
- * Mark an article as unread
- */
-export async function markArticleUnread(id: string): Promise<void> {
-  await db.articles.update(id, {
-    isRead: false,
-    updatedAt: new Date(),
-  });
-}
+// markArticleUnread removed - use toggleArticleRead instead
 
 /**
  * Toggle article read status
  */
-export async function toggleArticleRead(id: string): Promise<boolean> {
+export async function toggleArticleRead(id: string): Promise<number> {
   const article = await db.articles.get(id);
-  if (!article) return false;
+  if (!article) return 0; // Fixed: return 0 instead of false
 
-  const newReadState = !article.isRead;
+  const newReadState = article.isRead ? 0 : 1;
   await db.articles.update(id, {
     isRead: newReadState,
     updatedAt: new Date(),
@@ -250,34 +219,16 @@ export async function toggleArticleRead(id: string): Promise<boolean> {
   return newReadState;
 }
 
-/**
- * Star an article
- */
-export async function starArticle(id: string): Promise<void> {
-  await db.articles.update(id, {
-    isStarred: true,
-    updatedAt: new Date(),
-  });
-}
-
-/**
- * Unstar an article
- */
-export async function unstarArticle(id: string): Promise<void> {
-  await db.articles.update(id, {
-    isStarred: false,
-    updatedAt: new Date(),
-  });
-}
+// starArticle and unstarArticle removed - use toggleArticleStarred instead
 
 /**
  * Toggle article starred status
  */
-export async function toggleArticleStarred(id: string): Promise<boolean> {
+export async function toggleArticleStarred(id: string): Promise<number> {
   const article = await db.articles.get(id);
-  if (!article) return false;
+  if (!article) return 0; // Fixed: return 0 instead of false
 
-  const newStarredState = !article.isStarred;
+  const newStarredState = article.isStarred ? 0 : 1;
   await db.articles.update(id, {
     isStarred: newStarredState,
     updatedAt: new Date(),
@@ -285,15 +236,7 @@ export async function toggleArticleStarred(id: string): Promise<boolean> {
   return newStarredState;
 }
 
-/**
- * Delete an article (soft delete)
- */
-export async function deleteArticle(id: string): Promise<void> {
-  await db.articles.update(id, {
-    isDeleted: true,
-    updatedAt: new Date(),
-  });
-}
+// deleteArticle removed - not used in application
 
 // ============================================================================
 // SYNC STATE OPERATIONS
@@ -312,6 +255,8 @@ export async function getSyncState() {
 export async function updateSyncState(params: {
   lastSyncAt?: Date;
   cursor?: string;
+  feedCursor?: string;
+  articleCursor?: string;
 }): Promise<void> {
   const existing = await db.syncState.get("default");
 
@@ -333,19 +278,13 @@ export async function updateSyncState(params: {
  * Get counts for dashboard/stats
  */
 export async function getCounts() {
-  const [feeds, articles] = await Promise.all([
-    db.feeds.toArray(),
-    db.articles.toArray(),
-  ]);
-
-  const totalFeeds = feeds.filter((feed) => !feed.isDeleted).length;
-  const totalArticles = articles.filter((article) => !article.isDeleted).length;
-  const unreadCount = articles.filter(
-    (article) => !article.isRead && !article.isDeleted
-  ).length;
-  const starredCount = articles.filter(
-    (article) => article.isStarred && !article.isDeleted
-  ).length;
+  const [totalFeeds, totalArticles, unreadCount, starredCount] =
+    await Promise.all([
+      db.feeds.where("isDeleted").equals(0).count(),
+      db.articles.where("isDeleted").equals(0).count(),
+      db.articles.where("[isRead+isDeleted]").equals([0, 0]).count(),
+      db.articles.where("[isStarred+isDeleted]").equals([1, 0]).count(),
+    ]);
 
   return {
     totalFeeds,
@@ -353,6 +292,25 @@ export async function getCounts() {
     unreadCount,
     starredCount,
   };
+}
+
+/**
+ * Get article counts grouped by feed ID
+ * More efficient than calling getArticlesByFeed() for each feed
+ * Uses streaming to avoid loading all articles into memory at once
+ */
+export async function getArticleCountsByFeed(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+
+  // Use .each() to stream through articles without loading all into memory
+  await db.articles
+    .where("isDeleted")
+    .equals(0)
+    .each((article) => {
+      counts[article.feedId] = (counts[article.feedId] || 0) + 1;
+    });
+
+  return counts;
 }
 
 /**

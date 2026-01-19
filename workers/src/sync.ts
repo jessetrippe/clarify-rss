@@ -18,48 +18,68 @@ export async function syncPull(
   request: SyncPullRequest,
   env: Env
 ): Promise<SyncPullResponse> {
-  const cursor = request.cursor || "0";
+  const legacyCursor = request.cursor || "0";
+  const feedCursor = request.feedCursor || legacyCursor;
+  const articleCursor = request.articleCursor || legacyCursor;
   const limit = request.limit || 100;
 
-  // Convert cursor to timestamp
-  const cursorTimestamp = parseInt(cursor, 10);
+  const feedCursorParts = parseCursor(feedCursor);
+  const articleCursorParts = parseCursor(articleCursor);
 
   // Get feeds updated since cursor
   const feedsResult = await env.DB.prepare(
-    `SELECT * FROM feeds WHERE updated_at > ? ORDER BY updated_at ASC LIMIT ?`
+    `SELECT * FROM feeds
+     WHERE (updated_at > ? OR (updated_at = ? AND id > ?))
+     ORDER BY updated_at ASC, id ASC
+     LIMIT ?`
   )
-    .bind(cursorTimestamp, limit)
+    .bind(
+      feedCursorParts.updatedAt,
+      feedCursorParts.updatedAt,
+      feedCursorParts.id,
+      limit
+    )
     .all<Feed>();
 
   const feeds = feedsResult.results || [];
 
   // Get articles updated since cursor
   const articlesResult = await env.DB.prepare(
-    `SELECT * FROM articles WHERE updated_at > ? ORDER BY updated_at ASC LIMIT ?`
+    `SELECT * FROM articles
+     WHERE (updated_at > ? OR (updated_at = ? AND id > ?))
+     ORDER BY updated_at ASC, id ASC
+     LIMIT ?`
   )
-    .bind(cursorTimestamp, limit)
+    .bind(
+      articleCursorParts.updatedAt,
+      articleCursorParts.updatedAt,
+      articleCursorParts.id,
+      limit
+    )
     .all<Article>();
 
   const articles = articlesResult.results || [];
 
   // Determine if there are more results
-  const totalResults = feeds.length + articles.length;
-  const hasMore = totalResults >= limit;
+  const hasMore = feeds.length === limit || articles.length === limit;
 
-  // New cursor is the latest updated_at timestamp
-  let newCursor = cursor;
-  if (feeds.length > 0 || articles.length > 0) {
-    const latestFeedTime =
-      feeds.length > 0 ? feeds[feeds.length - 1].updated_at : 0;
-    const latestArticleTime =
-      articles.length > 0 ? articles[articles.length - 1].updated_at : 0;
-    newCursor = Math.max(latestFeedTime, latestArticleTime).toString();
-  }
+  const newFeedCursor =
+    feeds.length > 0
+      ? cursorFromRow(feeds[feeds.length - 1].updated_at, feeds[feeds.length - 1].id)
+      : feedCursor;
+  const newArticleCursor =
+    articles.length > 0
+      ? cursorFromRow(
+          articles[articles.length - 1].updated_at,
+          articles[articles.length - 1].id
+        )
+      : articleCursor;
 
   return {
     feeds,
     articles,
-    cursor: newCursor,
+    feedCursor: newFeedCursor,
+    articleCursor: newArticleCursor,
     hasMore,
   };
 }
@@ -165,4 +185,31 @@ export async function syncPush(
     articlesProcessed,
     conflicts,
   };
+}
+
+function parseCursor(cursor: string): { updatedAt: number; id: string } {
+  if (!cursor) {
+    return { updatedAt: 0, id: "" };
+  }
+
+  const separatorIndex = cursor.indexOf(":");
+  if (separatorIndex !== -1) {
+    const updatedAtPart = cursor.slice(0, separatorIndex);
+    const idPart = cursor.slice(separatorIndex + 1);
+    const updatedAt = Number.parseInt(updatedAtPart, 10);
+    return {
+      updatedAt: Number.isNaN(updatedAt) ? 0 : updatedAt,
+      id: idPart ? decodeURIComponent(idPart) : "",
+    };
+  }
+
+  const updatedAt = Number.parseInt(cursor, 10);
+  return {
+    updatedAt: Number.isNaN(updatedAt) ? 0 : updatedAt,
+    id: "",
+  };
+}
+
+function cursorFromRow(updatedAt: number, id: string): string {
+  return `${updatedAt}:${encodeURIComponent(id)}`;
 }

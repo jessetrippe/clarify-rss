@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { addFeed, feedExists, addArticle } from "@/lib/db-operations";
-import { parseFeed } from "@/lib/feed-parser";
+import {
+  addFeed,
+  addArticle,
+  getFeedByUrl,
+  updateFeed,
+} from "@/lib/db-operations";
+import { parseFeedFromApi, discoverFeedsFromApi, type FeedArticleData } from "@/lib/feed-api";
 
 interface OPMLImportProps {
   onSuccess?: () => void;
@@ -77,21 +82,61 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
 
         try {
           // Check if feed already exists
-          const exists = await feedExists(url);
-          if (exists) {
+          const existingFeed = await getFeedByUrl(url);
+          if (existingFeed && existingFeed.isDeleted === 0) {
             skipped++;
             continue;
           }
 
-          // Parse and add feed
-          const feedData = await parseFeed(url);
-          const feed = await addFeed({
-            url,
-            title: feedData.title,
-          });
+          // Parse and add feed (try direct parse, then discovery)
+          let feedData: { title: string; articles: any[] } | undefined;
+          let feedUrl = url;
+
+          try {
+            feedData = await parseFeedFromApi(url);
+          } catch (parseError) {
+            const discoveredFeeds = await discoverFeedsFromApi(url);
+            let parsed = false;
+
+            for (const discoveredUrl of discoveredFeeds) {
+              try {
+                feedData = await parseFeedFromApi(discoveredUrl);
+                feedUrl = discoveredUrl;
+                parsed = true;
+                break;
+              } catch {
+                // Try next discovered feed
+              }
+            }
+
+            if (!parsed) {
+              throw parseError;
+            }
+          }
+
+          if (!feedData) {
+            throw new Error("Failed to parse feed");
+          }
+
+          const feed = existingFeed
+            ? await updateFeed(existingFeed.id, {
+                title: feedData.title,
+                iconUrl: feedData.iconUrl,
+                isDeleted: 0,
+              }).then(() => ({
+                ...existingFeed,
+                title: feedData.title,
+                iconUrl: feedData.iconUrl,
+                isDeleted: 0,
+              }))
+            : await addFeed({
+                url: feedUrl,
+                title: feedData.title,
+                iconUrl: feedData.iconUrl,
+              });
 
           // Add initial articles
-          const articlePromises = feedData.articles.map((article) =>
+          const articlePromises = feedData.articles.map((article: FeedArticleData) =>
             addArticle({
               feedId: feed.id,
               guid: article.guid,
@@ -99,7 +144,7 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
               title: article.title,
               content: article.content,
               summary: article.summary,
-              publishedAt: article.publishedAt,
+              publishedAt: article.publishedAt ? new Date(article.publishedAt) : undefined,
             })
           );
           await Promise.all(articlePromises);

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { addFeed, feedExists, addArticle } from "@/lib/db-operations";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787";
+import { addFeed, getFeedByUrl, addArticle, updateFeed } from "@/lib/db-operations";
+import { parseFeedFromApi, discoverFeedsFromApi, type FeedArticleData } from "@/lib/feed-api";
 
 interface AddFeedFormProps {
   onSuccess?: () => void;
@@ -28,8 +27,8 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
 
     try {
       // Check if feed already exists
-      const exists = await feedExists(url);
-      if (exists) {
+      const existingFeed = await getFeedByUrl(url);
+      if (existingFeed && existingFeed.isDeleted === 0) {
         setError("This feed already exists");
         setIsLoading(false);
         return;
@@ -37,26 +36,28 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
 
       // Try to parse as feed
       try {
-        const response = await fetch(`${API_URL}/api/feeds/parse`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to parse feed");
-        }
-
-        const feedData = await response.json();
+        const feedData = await parseFeedFromApi(url);
 
         // Add feed to database
-        const feed = await addFeed({
-          url,
-          title: feedData.title,
-        });
+        const feed = existingFeed
+          ? await updateFeed(existingFeed.id, {
+              title: feedData.title,
+              iconUrl: feedData.iconUrl,
+              isDeleted: 0,
+            }).then(() => ({
+              ...existingFeed,
+              title: feedData.title,
+              iconUrl: feedData.iconUrl,
+              isDeleted: 0,
+            }))
+          : await addFeed({
+              url,
+              title: feedData.title,
+              iconUrl: feedData.iconUrl,
+            });
 
         // Add initial articles
-        const articlePromises = feedData.articles.map((article: any) =>
+        const articlePromises = feedData.articles.map((article: FeedArticleData) =>
           addArticle({
             feedId: feed.id,
             guid: article.guid,
@@ -75,15 +76,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
         if (onSuccess) onSuccess();
       } catch (parseError) {
         // Feed parsing failed, try auto-discovery
-        console.log("Feed parsing failed, attempting discovery...", parseError);
-
-        const discoverResponse = await fetch(`${API_URL}/api/feeds/discover`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-        });
-        const discoverData = await discoverResponse.json();
-        const discovered = discoverData.feeds || [];
+        const discovered = await discoverFeedsFromApi(url);
 
         if (discovered.length > 0) {
           setDiscoveredFeeds(discovered);

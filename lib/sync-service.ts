@@ -19,67 +19,95 @@ export class SyncService {
   async pull(): Promise<{ success: boolean; feedsCount: number; articlesCount: number; error?: string }> {
     try {
       const syncState = await getSyncState();
-      const cursor = syncState?.cursor || "0";
+      const legacyCursor = syncState?.cursor || "0";
+      let feedCursor = syncState?.feedCursor || legacyCursor;
+      let articleCursor = syncState?.articleCursor || legacyCursor;
+      const limit = 100;
 
-      // Call backend API
-      const response = await fetch(`${API_BASE_URL}/api/sync/pull`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cursor, limit: 100 }),
-      });
+      let totalFeeds = 0;
+      let totalArticles = 0;
+      let hasMore = true;
 
-      if (!response.ok) {
-        throw new Error(`Sync pull failed: ${response.statusText}`);
-      }
+      while (hasMore) {
+        const response = await fetch(`${API_BASE_URL}/api/sync/pull`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            feedCursor,
+            articleCursor,
+            limit,
+          }),
+        });
 
-      const data = await response.json();
-      const { feeds, articles, cursor: newCursor } = data;
-
-      // Merge feeds into local database
-      for (const feed of feeds) {
-        const existing = await db.feeds.get(feed.id);
-
-        // Only update if server version is newer or doesn't exist locally
-        if (!existing || existing.updated_at < feed.updated_at) {
-          await db.feeds.put({
-            ...feed,
-            lastFetchedAt: feed.last_fetched_at ? new Date(feed.last_fetched_at) : undefined,
-            createdAt: new Date(feed.created_at),
-            updatedAt: new Date(feed.updated_at),
-            isDeleted: Boolean(feed.is_deleted),
-          });
+        if (!response.ok) {
+          throw new Error(`Sync pull failed: ${response.statusText}`);
         }
-      }
 
-      // Merge articles into local database
-      for (const article of articles) {
-        const existing = await db.articles.get(article.id);
+        const data = await response.json();
+        const {
+          feeds,
+          articles,
+          feedCursor: newFeedCursor,
+          articleCursor: newArticleCursor,
+          hasMore: nextHasMore,
+        } = data;
 
-        // Only update if server version is newer or doesn't exist locally
-        if (!existing || existing.updated_at < article.updated_at) {
-          await db.articles.put({
-            ...article,
-            feedId: article.feed_id,
-            publishedAt: article.published_at ? new Date(article.published_at) : undefined,
-            isRead: Boolean(article.is_read),
-            isStarred: Boolean(article.is_starred),
-            createdAt: new Date(article.created_at),
-            updatedAt: new Date(article.updated_at),
-            isDeleted: Boolean(article.is_deleted),
-          });
+        // Merge feeds into local database
+        for (const feed of feeds) {
+          const existing = await db.feeds.get(feed.id);
+          const localUpdatedAt = existing?.updatedAt?.getTime() ?? 0;
+
+          // Only update if server version is newer or doesn't exist locally
+          if (!existing || localUpdatedAt < feed.updated_at) {
+            await db.feeds.put({
+              ...feed,
+              iconUrl: existing?.iconUrl,
+              lastFetchedAt: feed.last_fetched_at ? new Date(feed.last_fetched_at) : undefined,
+              createdAt: new Date(feed.created_at),
+              updatedAt: new Date(feed.updated_at),
+              isDeleted: typeof feed.is_deleted === "number" ? feed.is_deleted : 0,
+            });
+          }
         }
+
+        // Merge articles into local database
+        for (const article of articles) {
+          const existing = await db.articles.get(article.id);
+          const localUpdatedAt = existing?.updatedAt?.getTime() ?? 0;
+
+          // Only update if server version is newer or doesn't exist locally
+          if (!existing || localUpdatedAt < article.updated_at) {
+            await db.articles.put({
+              ...article,
+              feedId: article.feed_id,
+              publishedAt: article.published_at ? new Date(article.published_at) : undefined,
+              isRead: typeof article.is_read === "number" ? article.is_read : 0,
+              isStarred: typeof article.is_starred === "number" ? article.is_starred : 0,
+              createdAt: new Date(article.created_at),
+              updatedAt: new Date(article.updated_at),
+              isDeleted: typeof article.is_deleted === "number" ? article.is_deleted : 0,
+            });
+          }
+        }
+
+        totalFeeds += feeds.length;
+        totalArticles += articles.length;
+        feedCursor = newFeedCursor;
+        articleCursor = newArticleCursor;
+        hasMore = nextHasMore;
       }
 
       // Update sync state
       await updateSyncState({
         lastSyncAt: new Date(),
-        cursor: newCursor,
+        feedCursor,
+        articleCursor,
       });
 
       return {
         success: true,
-        feedsCount: feeds.length,
-        articlesCount: articles.length,
+        feedsCount: totalFeeds,
+        articlesCount: totalArticles,
       };
     } catch (error) {
       console.error("Sync pull error:", error);
@@ -125,7 +153,7 @@ export class SyncService {
         last_error: f.lastError,
         created_at: f.createdAt.getTime(),
         updated_at: f.updatedAt.getTime(),
-        is_deleted: f.isDeleted ? 1 : 0,
+        is_deleted: f.isDeleted,
       }));
 
       const articlesToSync = articles.map((a) => ({
@@ -137,11 +165,11 @@ export class SyncService {
         content: a.content,
         summary: a.summary,
         published_at: a.publishedAt?.getTime(),
-        is_read: a.isRead ? 1 : 0,
-        is_starred: a.isStarred ? 1 : 0,
+        is_read: a.isRead,
+        is_starred: a.isStarred,
         created_at: a.createdAt.getTime(),
         updated_at: a.updatedAt.getTime(),
-        is_deleted: a.isDeleted ? 1 : 0,
+        is_deleted: a.isDeleted,
       }));
 
       // Push to server

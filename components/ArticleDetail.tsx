@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { format } from "date-fns";
 import {
   getArticleById,
@@ -14,56 +14,126 @@ import {
 import type { Article, Feed } from "@/lib/types";
 import { sanitizeHTML } from "@/lib/sanitize";
 import { copyArticleContent } from "@/lib/copy-content";
+import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
+import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
+import { createMapCacheManager } from "@/lib/cache";
 
-export default function ArticleDetail() {
-  const params = useParams();
+// Global cache for articles to enable instant navigation
+type CachedArticleData = { article: Article; feed: Feed | null };
+const articleCache = createMapCacheManager<string, CachedArticleData>("Article");
+
+interface ArticleDetailProps {
+  articleId: string;
+  onBack: () => void;
+}
+
+export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps) {
   const router = useRouter();
-  const articleId = decodeURIComponent(params.id as string);
+  const pathname = usePathname();
 
-  const [article, setArticle] = useState<Article | null>(null);
-  const [feed, setFeed] = useState<Feed | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Initialize state from cache for instant rendering
+  const [articleState, setArticleState] = useState<{
+    article: Article | null;
+    feed: Feed | null;
+    isLoading: boolean;
+  }>(() => {
+    const cached = articleCache.get(articleId);
+    return {
+      article: cached?.article || null,
+      feed: cached?.feed || null,
+      isLoading: !cached,
+    };
+  });
+
+  const { article, feed, isLoading } = articleState;
   const [copyStatus, setCopyStatus] = useState<string>("");
 
   useEffect(() => {
+    let mounted = true;
+
     const loadArticleData = async () => {
-      setIsLoading(true);
+      // Only set loading if we don't have cached data
+      if (!articleCache.has(articleId)) {
+        setArticleState(prev => ({ ...prev, isLoading: true }));
+      }
+
       try {
         const articleData = await getArticleById(articleId);
 
         if (!articleData) {
-          router.push("/");
+          if (mounted) {
+            // Navigate back to list if article not found
+            onBack();
+          }
           return;
         }
 
-        setArticle(articleData);
+        if (!mounted) return;
 
-        // Mark as read (auto-mark on open)
-        if (!articleData.isRead) {
-          await markArticleRead(articleId);
-          // Update local state
-          setArticle({ ...articleData, isRead: true });
-        }
-
-        // Load feed data
+        // Load feed data first, then set all state at once
         const feedData = await getFeedById(articleData.feedId);
-        setFeed(feedData || null);
+
+        if (!mounted) return;
+
+        // Set article and feed together to reduce renders
+        setArticleState({
+          article: articleData,
+          feed: feedData || null,
+          isLoading: false,
+        });
+
+        // Update cache with complete data
+        articleCache.set(articleId, { article: articleData, feed: feedData || null });
+
+        // Mark as read in background (don't await)
+        if (articleData.isRead === 0) {
+          markArticleRead(articleId)
+            .then(() => {
+              if (mounted) {
+                setArticleState(prev => ({
+                  ...prev,
+                  article: prev.article ? { ...prev.article, isRead: 1 } : null,
+                }));
+              }
+            })
+            .catch((error) => {
+              console.error("Failed to mark article as read:", error);
+            });
+        }
       } catch (error) {
         console.error("Error loading article:", error);
-      } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setArticleState(prev => ({ ...prev, isLoading: false }));
+        }
       }
     };
 
-    loadArticleData();
-  }, [articleId, router]);
+    if (articleId) {
+      loadArticleData();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [articleId, onBack]);
+
+  if (!articleId) {
+    return (
+      <div className="text-gray-500 dark:text-gray-400 text-center py-12">
+        Invalid article
+      </div>
+    );
+  }
 
   const handleToggleStarred = async () => {
     if (!article) return;
 
     try {
       const newStarredState = await toggleArticleStarred(article.id);
-      setArticle({ ...article, isStarred: newStarredState });
+      setArticleState(prev => ({
+        ...prev,
+        article: prev.article ? { ...prev.article, isStarred: newStarredState } : null,
+      }));
     } catch (error) {
       console.error("Error toggling starred:", error);
     }
@@ -74,7 +144,10 @@ export default function ArticleDetail() {
 
     try {
       const newReadState = await toggleArticleRead(article.id);
-      setArticle({ ...article, isRead: newReadState });
+      setArticleState(prev => ({
+        ...prev,
+        article: prev.article ? { ...prev.article, isRead: newReadState } : null,
+      }));
     } catch (error) {
       console.error("Error toggling read:", error);
     }
@@ -101,32 +174,47 @@ export default function ArticleDetail() {
     }
   };
 
-  if (isLoading) {
+  // Only show loading skeleton if we don't have cached data
+  if (isLoading && !article) {
     return (
-      <div>
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+      <div className="max-w-3xl mx-auto">
+        {/* Back button - only on mobile */}
+        <div className="mb-6 xl:hidden">
+          <button
+            onClick={onBack}
+            className="text-blue-600 dark:text-blue-400 hover:underline text-sm transition-colors duration-200"
           >
-            ← Back to All Items
-          </Link>
+            ← Back
+          </button>
         </div>
-        <div className="text-gray-500 text-center py-12">Loading article...</div>
+        {/* Skeleton UI for first-time loads */}
+        <div className="animate-pulse">
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-8"></div>
+          <div className="flex gap-3 mb-8">
+            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+          </div>
+          <div className="space-y-3">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!article) {
     return (
-      <div>
-        <div className="mb-6">
-          <Link
-            href="/"
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-6 xl:hidden">
+          <button
+            onClick={onBack}
             className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
-            ← Back to All Items
-          </Link>
+            ← Back
+          </button>
         </div>
         <div className="text-gray-500 text-center py-12">Article not found</div>
       </div>
@@ -135,14 +223,14 @@ export default function ArticleDetail() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          href="/"
-          className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+      {/* Back button - only on mobile */}
+      <div className="mb-6 xl:hidden">
+        <button
+          onClick={onBack}
+          className="text-blue-600 dark:text-blue-400 hover:underline text-sm transition-colors duration-200"
         >
-          ← Back to All Items
-        </Link>
+          ← Back
+        </button>
       </div>
 
       {/* Article Header */}
@@ -184,19 +272,29 @@ export default function ArticleDetail() {
           </button>
           <button
             onClick={handleToggleStarred}
-            className={`px-4 py-2 rounded-md font-medium ${
-              article.isStarred
+            className={`px-4 py-2 rounded-md font-medium inline-flex items-center gap-2 ${
+              article.isStarred === 1
                 ? "bg-yellow-500 text-white hover:bg-yellow-600"
                 : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
             }`}
           >
-            {article.isStarred ? "★ Starred" : "☆ Star"}
+            {article.isStarred === 1 ? (
+              <>
+                <StarSolidIcon className="h-4 w-4" aria-hidden="true" />
+                Starred
+              </>
+            ) : (
+              <>
+                <StarOutlineIcon className="h-4 w-4" aria-hidden="true" />
+                Star
+              </>
+            )}
           </button>
           <button
             onClick={handleToggleRead}
             className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 font-medium"
           >
-            {article.isRead ? "Mark Unread" : "Mark Read"}
+            {article.isRead === 1 ? "Mark Unread" : "Mark Read"}
           </button>
         </div>
 

@@ -1,0 +1,15 @@
+import coreWebVitals from "eslint-config-next/core-web-vitals";
+
+const config = [
+  ...coreWebVitals,
+  {
+    ignores: ["workers/.wrangler/**"],
+  },
+  {
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
+];
+
+export default config;

@@ -1,7 +1,44 @@
 // Dexie database setup for local-first storage
 
-import Dexie, { type EntityTable } from "dexie";
+import Dexie, { type EntityTable, type Transaction } from "dexie";
 import type { Feed, Article, SyncState } from "./types";
+
+// Helper function to normalize data during migrations
+function normalizeDatabaseData(tx: Transaction) {
+  return Promise.all([
+    tx.table("feeds").toCollection().modify((feed: any) => {
+      if (typeof feed.isDeleted === "boolean") feed.isDeleted = feed.isDeleted ? 1 : 0;
+      if (typeof feed.isDeleted !== "number") feed.isDeleted = 0;
+      if (feed.createdAt && !(feed.createdAt instanceof Date)) {
+        feed.createdAt = new Date(feed.createdAt);
+      }
+      if (!feed.createdAt) feed.createdAt = new Date();
+      if (feed.updatedAt && !(feed.updatedAt instanceof Date)) {
+        feed.updatedAt = new Date(feed.updatedAt);
+      }
+      if (!feed.updatedAt) feed.updatedAt = feed.createdAt;
+    }),
+    tx.table("articles").toCollection().modify((article: any) => {
+      if (typeof article.isDeleted === "boolean") article.isDeleted = article.isDeleted ? 1 : 0;
+      if (typeof article.isDeleted !== "number") article.isDeleted = 0;
+      if (typeof article.isRead === "boolean") article.isRead = article.isRead ? 1 : 0;
+      if (typeof article.isRead !== "number") article.isRead = 0;
+      if (typeof article.isStarred === "boolean") article.isStarred = article.isStarred ? 1 : 0;
+      if (typeof article.isStarred !== "number") article.isStarred = 0;
+      if (article.createdAt && !(article.createdAt instanceof Date)) {
+        article.createdAt = new Date(article.createdAt);
+      }
+      if (!article.createdAt) article.createdAt = new Date();
+      if (article.updatedAt && !(article.updatedAt instanceof Date)) {
+        article.updatedAt = new Date(article.updatedAt);
+      }
+      if (!article.updatedAt) article.updatedAt = article.createdAt;
+      if (article.publishedAt && !(article.publishedAt instanceof Date)) {
+        article.publishedAt = new Date(article.publishedAt);
+      }
+    }),
+  ]);
+}
 
 export class ClarifyDB extends Dexie {
   feeds!: EntityTable<Feed, "id">;
@@ -25,6 +62,20 @@ export class ClarifyDB extends Dexie {
       // Sync state table (single row)
       syncState: "id",
     });
+
+    this.version(2).stores({
+      feeds: "id, url, isDeleted, updatedAt",
+      articles:
+        "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted]",
+      syncState: "id",
+    }).upgrade(normalizeDatabaseData);
+
+    this.version(3).stores({
+      feeds: "id, url, isDeleted, updatedAt",
+      articles:
+        "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted]",
+      syncState: "id",
+    }).upgrade(normalizeDatabaseData);
   }
 }
 

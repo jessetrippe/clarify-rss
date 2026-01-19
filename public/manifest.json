@@ -44,10 +44,10 @@
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Feeds",
-      "short_name": "Feeds",
+      "name": "Settings",
+      "short_name": "Settings",
       "description": "Manage your RSS feeds",
-      "url": "/feeds",
+      "url": "/settings",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]

@@ -5,11 +5,12 @@ export interface Feed {
   id: string;
   url: string;
   title: string;
+  iconUrl?: string;
   lastFetchedAt?: Date;
   lastError?: string;
   createdAt: Date;
   updatedAt: Date;
-  isDeleted: boolean;
+  isDeleted: number;
 }
 
 export interface Article {
@@ -21,15 +22,17 @@ export interface Article {
   content?: string;
   summary?: string;
   publishedAt?: Date;
-  isRead: boolean;
-  isStarred: boolean;
+  isRead: number;
+  isStarred: number;
   createdAt: Date;
   updatedAt: Date;
-  isDeleted: boolean;
+  isDeleted: number;
 }
 
 export interface SyncState {
   id: string;
   lastSyncAt?: Date;
   cursor?: string;
+  feedCursor?: string;
+  articleCursor?: string;
 }

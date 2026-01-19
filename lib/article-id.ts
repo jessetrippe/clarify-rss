@@ -1,6 +1,11 @@
 // Article ID generation utility
 // Generates stable, unique IDs for articles across feed refreshes
 
+// ID prefix constants
+const ID_PREFIX_GUID = "guid:";
+const ID_PREFIX_URL = "url:";
+const ID_PREFIX_HASH = "hash:";
+
 /**
  * Generates a stable article ID using the following priority:
  * 1. GUID (if provided by feed)
@@ -21,18 +26,18 @@ export function generateArticleId(params: {
 
   // Priority 1: Use GUID if available
   if (guid) {
-    return `guid:${guid}`;
+    return `${ID_PREFIX_GUID}${guid}`;
   }
 
   // Priority 2: Use URL if available
   if (url) {
-    return `url:${url}`;
+    return `${ID_PREFIX_URL}${url}`;
   }
 
   // Priority 3: Generate hash from feedId + title + publishedAt
   const timestamp = publishedAt ? publishedAt.getTime() : 0;
   const hashInput = `${feedId}:${title}:${timestamp}`;
-  return `hash:${simpleHash(hashInput)}`;
+  return `${ID_PREFIX_HASH}${simpleHash(hashInput)}`;
 }
 
 /**
