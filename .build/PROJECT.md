@@ -46,6 +46,12 @@ A comprehensive code review was performed and all identified issues have been fi
 - `lib/retry.ts` - Retry with exponential backoff
 - `workers/src/rate-limiter.ts` - Rate limiting for worker endpoints
 
+### Deployment Decision (2026-01-18)
+
+- **Hosting:** Netlify (frontend + serverless functions)
+- **Database:** Supabase Postgres
+- **Auth:** Supabase Auth (Magic Link)
+
 ---
 
 ## Previous Progress (2026-01-13)

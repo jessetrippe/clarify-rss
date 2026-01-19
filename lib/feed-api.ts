@@ -3,8 +3,9 @@
  */
 
 import { validateUrl } from "./validation";
+import { getAccessToken } from "@/lib/supabase/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Request timeout in milliseconds
 const REQUEST_TIMEOUT_MS = 30000;
@@ -52,10 +53,14 @@ async function fetchWithTimeout(
 export async function parseFeedFromApi(url: string): Promise<FeedData> {
   // Validate and normalize the URL
   const validatedUrl = validateUrl(url);
+  const accessToken = await getAccessToken();
 
   const response = await fetchWithTimeout(`${API_URL}/api/feeds/parse`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ url: validatedUrl }),
   });
 
@@ -82,10 +87,14 @@ export async function parseFeedFromApi(url: string): Promise<FeedData> {
 export async function discoverFeedsFromApi(url: string): Promise<string[]> {
   // Validate and normalize the URL
   const validatedUrl = validateUrl(url);
+  const accessToken = await getAccessToken();
 
   const response = await fetchWithTimeout(`${API_URL}/api/feeds/discover`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ url: validatedUrl }),
   });
 
@@ -120,9 +129,13 @@ export async function extractArticleContent(
   articleId: string,
   url: string
 ): Promise<ExtractArticleResult> {
+  const accessToken = await getAccessToken();
   const response = await fetchWithTimeout(`${API_URL}/api/articles/extract`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ articleId, url }),
   });
 

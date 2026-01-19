@@ -13,16 +13,9 @@ This comprehensive guide covers testing for all implemented features. Choose you
 
 ## 🚀 Quick Start (5 Minutes)
 
-### 1. Start the Servers
+### 1. Start the Server
 
-**Terminal 1 - Worker (Backend):**
-```bash
-cd /Users/jessetrippe/Sites/clarify-rss/workers
-npx wrangler dev --local
-```
-Wait for: `Ready on http://localhost:8787`
-
-**Terminal 2 - Frontend:**
+**Terminal 1 - Frontend + API Routes:**
 ```bash
 cd /Users/jessetrippe/Sites/clarify-rss
 npm run dev
@@ -210,9 +203,9 @@ Source: [Article URL]
 
 ## Phase 4: Backend Sync
 
-**Goal:** Verify sync between frontend (IndexedDB) and backend (D1)
+**Goal:** Verify sync between frontend (IndexedDB) and backend (Supabase)
 
-**Prerequisites:** Both servers running (Worker + Next.js)
+**Prerequisites:** Next.js server running and Supabase configured
 
 ### Initial Sync
 
@@ -250,12 +243,12 @@ Source: [Article URL]
 
 **Goal:** Verify real RSS/Atom parsing (no more mocks!)
 
-**Prerequisites:** Worker must be running on port 8787
+**Prerequisites:** Next.js server running on port 3000
 
-### Test Worker Health
+### Test API Health
 
 ```bash
-curl http://localhost:8787/api/health
+curl http://localhost:3000/api/health
 ```
 
 **Expected:** `{"status":"ok","timestamp":...}`
@@ -477,23 +470,18 @@ These components are available for use but need to be wired into pages:
 
 ## 🐛 Troubleshooting
 
-### Worker won't start
+### API routes not responding
 
-**Error: "Could not resolve 'http'"**
+**Error: "Unauthorized"**
 
-Already fixed! Verify `workers/wrangler.toml` has:
-```toml
-compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
-```
+- Confirm Supabase Auth is enabled (Magic Link)
+- Ensure auth session exists (sign in again)
+- Verify `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-**Error: "npm ERR! missing script: dev"**
+**Error: "Server not configured"**
 
-Wrong directory. Run:
-```bash
-cd /Users/jessetrippe/Sites/clarify-rss/workers
-npx wrangler dev --local
-```
+- Verify `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in your env
+- Restart `npm run dev` after updating env vars
 
 ### Frontend won't start
 
@@ -509,16 +497,15 @@ npm run dev
 
 **"Failed to parse feed"**
 
-- Check Worker is running: `curl http://localhost:8787/api/health`
+- Check API health: `curl http://localhost:3000/api/health`
 - Try a different feed URL
 - Check browser console for network errors
-- Verify CORS headers (should be set)
 
 **"Sync failed"**
 
-- Normal if Worker isn't running
-- Start Worker first, then refresh frontend
-- Network errors are now silenced in the console (expected behavior)
+- Re-authenticate (magic link)
+- Confirm Supabase schema is installed
+- Check browser console for errors
 
 ### Offline mode not working
 
@@ -578,10 +565,9 @@ npm run dev
 
 **Changes not syncing**
 
-- Check both servers running
+- Check Next.js server is running
 - Check browser console for errors
-- Check Worker console (Terminal 1)
-- Verify CORS headers
+- Confirm Supabase schema is installed
 
 **Sync taking too long**
 
@@ -619,7 +605,7 @@ npm run dev
 - [ ] No dangerous tags in content
 
 ### Phase 4: Backend Sync ✓
-- [ ] Worker health endpoint responds
+- [ ] API health endpoint responds
 - [ ] Initial sync completes
 - [ ] Manual sync works
 - [ ] Data syncs between tabs
@@ -681,7 +667,7 @@ npm run dev
 - Feed management (add, delete, OPML import/export)
 - Article reading with read/starred states
 - **Copy Content feature (THE CORE FEATURE)**
-- Backend sync (Cloudflare Workers + D1)
+- Backend sync (Supabase + API routes)
 - Conflict resolution (last-write-wins)
 - Rate limiting (5-minute minimum)
 - Feed auto-discovery
@@ -709,8 +695,7 @@ npm run dev
 ### 🚧 Not Yet Implemented (Phase 7 Remaining):
 
 - Content Security Policy headers
-- Production deployment (Cloudflare Pages)
-- Cloudflare Access authentication
+- Production deployment (Netlify)
 - UI polish and animations
 - Performance benchmarking
 - Multi-device sync testing (requires production)
@@ -750,8 +735,8 @@ If tests fail:
 
 1. Check troubleshooting section above
 2. Check browser console for errors
-3. Check Worker terminal for errors
-4. Verify both servers are running
+3. Verify Supabase env vars are set
+4. Verify `npm run dev` is running
 5. Try hard refresh (Ctrl+Shift+R)
 6. Clear site data and start fresh
 

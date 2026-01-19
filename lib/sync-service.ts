@@ -3,9 +3,10 @@
 import { db } from "./db";
 import type { Feed, Article } from "./types";
 import { getSyncState, updateSyncState } from "./db-operations";
+import { getAccessToken } from "@/lib/supabase/auth";
 
 // API base URL (localhost for development, will be replaced with actual domain in production)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Maximum number of sync iterations to prevent infinite loops
 const MAX_SYNC_ITERATIONS = 100;
@@ -56,6 +57,7 @@ export class SyncService {
    */
   async pull(): Promise<{ success: boolean; feedsCount: number; articlesCount: number; error?: string }> {
     try {
+      const accessToken = await getAccessToken();
       const syncState = await getSyncState();
       const legacyCursor = syncState?.cursor || "0";
       let feedCursor = syncState?.feedCursor || legacyCursor;
@@ -72,7 +74,10 @@ export class SyncService {
 
         const response = await fetchWithTimeout(`${API_BASE_URL}/api/sync/pull`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
           body: JSON.stringify({
             feedCursor,
             articleCursor,
@@ -192,6 +197,7 @@ export class SyncService {
    */
   async push(): Promise<{ success: boolean; error?: string }> {
     try {
+      const accessToken = await getAccessToken();
       const syncState = await getSyncState();
       const lastSyncTime = syncState?.lastSyncAt?.getTime() || 0;
 
@@ -246,7 +252,10 @@ export class SyncService {
       // Push to server
       const response = await fetchWithTimeout(`${API_BASE_URL}/api/sync/push`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
           feeds: feedsToSync,
           articles: articlesToSync,

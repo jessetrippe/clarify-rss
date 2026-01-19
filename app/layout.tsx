@@ -4,6 +4,7 @@ import OfflineIndicator from "@/components/OfflineIndicator";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { MobileMenuProvider } from "@/components/MobileMenuProvider";
 import LayoutShell from "@/components/LayoutShell";
+import AuthGate from "@/components/AuthGate";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -42,12 +43,14 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen">
         <ErrorBoundary>
-          <SyncProvider>
-            <OfflineIndicator />
-            <MobileMenuProvider>
-              <LayoutShell>{children}</LayoutShell>
-            </MobileMenuProvider>
-          </SyncProvider>
+          <AuthGate>
+            <SyncProvider>
+              <OfflineIndicator />
+              <MobileMenuProvider>
+                <LayoutShell>{children}</LayoutShell>
+              </MobileMenuProvider>
+            </SyncProvider>
+          </AuthGate>
         </ErrorBoundary>
       </body>
     </html>

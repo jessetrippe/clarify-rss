@@ -9,11 +9,13 @@ import { exportOPML } from "@/lib/opml-export";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PromptDialog from "@/components/PromptDialog";
 import AlertDialog from "@/components/AlertDialog";
+import { supabase } from "@/lib/supabase/client";
 
 export default function Settings() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [feedCounts, setFeedCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Modal states
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; feedId: string; feedTitle: string }>({
@@ -51,6 +53,18 @@ export default function Settings() {
   useEffect(() => {
     loadFeeds();
   }, []);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUserEmail(data.user?.email ?? null);
+    };
+    loadUser();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   const handleDeleteFeed = (id: string, title: string) => {
     setDeleteDialog({ isOpen: true, feedId: id, feedTitle: title });
@@ -121,16 +135,31 @@ export default function Settings() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Settings</h1>
-        {feeds.length > 0 && (
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Settings</h1>
+          {userEmail && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Signed in as {userEmail}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {feeds.length > 0 && (
+            <button
+              onClick={handleExportOPML}
+              className="px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              Export OPML
+            </button>
+          )}
           <button
-            onClick={handleExportOPML}
-            className="px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            onClick={handleSignOut}
+            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
           >
-            Export OPML
+            Sign out
           </button>
-        )}
+        </div>
       </div>
 
       <div className="space-y-6">

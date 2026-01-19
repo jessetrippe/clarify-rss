@@ -22,9 +22,10 @@ See [Project](./.build/PROJECT.md) for product scope and implementation roadmap.
 
 - **Frontend:** Next.js 15 (App Router), TypeScript, Tailwind CSS
 - **Storage:** IndexedDB (via Dexie.js)
-- **Backend:** Cloudflare Workers + D1 (SQLite)
-- **Auth:** Cloudflare Access (Zero Trust)
-- **Hosting:** Cloudflare Pages
+- **Backend:** Next.js API Routes (Netlify Functions)
+- **Database:** Supabase Postgres
+- **Auth:** Supabase Auth (Magic Link)
+- **Hosting:** Netlify
 
 ## Development
 
@@ -43,6 +44,13 @@ npm start
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Supabase Setup
+
+1. Create a Supabase project and enable Magic Link auth.
+2. Run the SQL in `supabase/schema.sql` to create tables.
+3. Run the SQL in `supabase/rls.sql` to enable Row Level Security policies.
+4. Set env vars (see `.env.example`).
 
 ## Project Structure
 
