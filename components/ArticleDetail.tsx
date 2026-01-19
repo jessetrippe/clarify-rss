@@ -9,11 +9,17 @@ import {
   markArticleRead,
   toggleArticleStarred,
   toggleArticleRead,
+  updateArticleContent,
+  updateArticleExtractionStatus,
 } from "@/lib/db-operations";
+import { extractArticleContent } from "@/lib/feed-api";
 import type { Article, Feed } from "@/lib/types";
 import { sanitizeHTML } from "@/lib/sanitize";
 import { copyArticleContent } from "@/lib/copy-content";
-import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
+import {
+  ClipboardIcon,
+  StarIcon as StarOutlineIcon,
+} from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { createMapCacheManager } from "@/lib/cache";
 
@@ -44,6 +50,13 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
   const { article, feed, isLoading } = articleState;
   const [copyStatus, setCopyStatus] = useState<string>("");
   const copyStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Extraction state
+  const [extractionState, setExtractionState] = useState<{
+    isExtracting: boolean;
+    error?: string;
+  }>({ isExtracting: false });
+  const extractionAttemptedRef = useRef<string | null>(null);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -122,6 +135,95 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
       mounted = false;
     };
   }, [articleId, onBack]);
+
+  // Auto-extract article content when viewing an article with summary but no content
+  const handleExtractContent = useCallback(async () => {
+    if (!article?.url || !article.id) return;
+
+    setExtractionState({ isExtracting: true });
+    extractionAttemptedRef.current = article.id;
+
+    try {
+      // Update status to extracting
+      await updateArticleExtractionStatus(article.id, 'extracting');
+
+      const result = await extractArticleContent(article.id, article.url);
+
+      if (result.success && result.content) {
+        // Update database with extracted content
+        await updateArticleContent(article.id, result.content, 'completed');
+
+        // Update local state
+        setArticleState(prev => ({
+          ...prev,
+          article: prev.article ? {
+            ...prev.article,
+            content: result.content,
+            extractionStatus: 'completed' as const,
+            extractedAt: new Date(),
+          } : null,
+        }));
+
+        setExtractionState({ isExtracting: false });
+      } else {
+        // Update database with failed status
+        await updateArticleExtractionStatus(article.id, 'failed', result.error);
+
+        // Update local state
+        setArticleState(prev => ({
+          ...prev,
+          article: prev.article ? {
+            ...prev.article,
+            extractionStatus: 'failed' as const,
+            extractionError: result.error,
+          } : null,
+        }));
+
+        setExtractionState({ isExtracting: false, error: result.error });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await updateArticleExtractionStatus(article.id, 'failed', errorMessage);
+      setExtractionState({ isExtracting: false, error: errorMessage });
+    }
+  }, [article?.id, article?.url]);
+
+  // Auto-trigger extraction when article loads
+  useEffect(() => {
+    if (!article) return;
+
+    // Check if content appears truncated (common patterns from RSS feeds)
+    const isTruncatedContent = (content: string | undefined): boolean => {
+      if (!content) return false;
+      const trimmed = content.trim();
+      // Common truncation patterns
+      return (
+        trimmed.endsWith('…') ||
+        trimmed.endsWith('...') ||
+        trimmed.includes('Read the full story at') ||
+        trimmed.includes('Continue reading') ||
+        trimmed.includes('[...]') ||
+        trimmed.includes('Read more')
+      );
+    };
+
+    // Check if we should auto-extract:
+    // - Has no content, OR has truncated content
+    // - Has a URL to extract from
+    // - Hasn't already been extracted (completed or failed)
+    // - We haven't already attempted extraction for this article
+    const needsExtraction = !article.content || isTruncatedContent(article.content);
+    const shouldExtract =
+      needsExtraction &&
+      article.url &&
+      article.extractionStatus !== 'completed' &&
+      article.extractionStatus !== 'failed' &&
+      extractionAttemptedRef.current !== article.id;
+
+    if (shouldExtract) {
+      handleExtractContent();
+    }
+  }, [article, handleExtractContent]);
 
   if (!articleId) {
     return (
@@ -277,9 +379,10 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
         <div className="mb-6 flex flex-wrap gap-3">
           <button
             onClick={handleCopyContent}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium inline-flex items-center gap-2"
           >
-            Copy Content
+            <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
+            Copy
           </button>
           <button
             onClick={handleToggleStarred}
@@ -322,8 +425,43 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
           </div>
         )}
 
+        {/* Extraction Status */}
+        {extractionState.isExtracting && (
+          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-center gap-3">
+              <svg className="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-blue-800 dark:text-blue-200">
+                Fetching full article from {article.url ? new URL(article.url).hostname : 'source'}...
+              </span>
+            </div>
+          </div>
+        )}
+
+        {extractionState.error && !extractionState.isExtracting && (
+          <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-amber-800 dark:text-amber-200 font-medium">Could not fetch full article</p>
+                <p className="text-amber-700 dark:text-amber-300 text-sm mt-1">{extractionState.error}</p>
+              </div>
+              <button
+                onClick={() => {
+                  extractionAttemptedRef.current = null;
+                  handleExtractContent();
+                }}
+                className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700 whitespace-nowrap"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Article Content */}
-        <div className="prose dark:prose-invert max-w-none">
+        <div className="prose prose-slate dark:prose-invert max-w-none">
           {article.content ? (
             <div
               dangerouslySetInnerHTML={{ __html: sanitizeHTML(article.content) }}
@@ -331,7 +469,7 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
           ) : article.summary ? (
             <div className="text-gray-600 dark:text-gray-400">
               <p>{article.summary}</p>
-              {article.url && (
+              {article.url && !extractionState.isExtracting && (
                 <p className="mt-4">
                   <a
                     href={article.url}

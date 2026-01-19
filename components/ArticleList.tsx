@@ -31,13 +31,12 @@ const ArticleItem = React.memo(function ArticleItem({
   return (
     <Link
       href={`${sourcePath}?article=${encodeURIComponent(article.id)}`}
-      className={`block border border-gray-300 dark:border-gray-700 rounded-lg p-4 transition-colors ${
+      className={`p-4 transition-colors flex items-start justify-between gap-4 border-t-1 border-black/15 dark:border-white/15 ${
         article.isRead === 0
           ? "bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
           : "bg-gray-50 dark:bg-gray-900/60 hover:bg-gray-100 dark:hover:bg-gray-800"
       }`}
     >
-      <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Title with unread indicator */}
           <h3
@@ -87,7 +86,6 @@ const ArticleItem = React.memo(function ArticleItem({
             )}
           </div>
         </div>
-      </div>
     </Link>
   );
 }, (prevProps, nextProps) => {
@@ -122,7 +120,7 @@ const ArticleList = React.memo(function ArticleList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col">
       {articles.map((article) => (
         <ArticleItem
           key={article.id}

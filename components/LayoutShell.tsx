@@ -36,7 +36,7 @@ export default function LayoutShell({
       />
 
       {/* Main content area */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
+      <main className="flex-1 overflow-y-auto">
         {children}
       </main>
     </div>

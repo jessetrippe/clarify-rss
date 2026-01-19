@@ -53,11 +53,13 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lastScrollPosition = useRef<number>(0);
 
+  const readSessionKey = `clarify-read-session-${variant}-${feedId || "all"}`;
+
   // Session-based read tracking to prevent immediate article removal
   // Initialize from sessionStorage to persist across route changes
   const [readInSession, setReadInSession] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    const stored = sessionStorage.getItem(`clarify-read-session-${variant}-${feedId || 'all'}`);
+    if (typeof window === "undefined") return new Set();
+    const stored = sessionStorage.getItem(readSessionKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
@@ -196,31 +198,57 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
   }, [resolvedArticles, showRead, readInSession]);
 
   // Detect newly read articles and keep them visible for this session
+  const previousReadState = useRef<Map<string, number>>(new Map());
+
   useEffect(() => {
     if (freezeQuery || !articles) return; // Skip when frozen
 
-    articles.forEach(article => {
-      if (article.isRead === 1 && !readInSession.has(article.id)) {
-        uiLogger.debug('Article marked as read, keeping visible:', article.id);
-        setReadInSession(prev => {
-          const newSet = new Set(prev).add(article.id);
-          // Persist to sessionStorage
-          sessionStorage.setItem(
-            `clarify-read-session-${variant}-${feedId || 'all'}`,
-            JSON.stringify(Array.from(newSet))
-          );
-          return newSet;
-        });
+    const prevMap = previousReadState.current;
+    const nextMap = new Map<string, number>();
+
+    setReadInSession(prev => {
+      let next = prev;
+      let changed = false;
+
+      articles.forEach(article => {
+        const prevRead = prevMap.get(article.id);
+
+        if (prevRead === 0 && article.isRead === 1 && !prev.has(article.id)) {
+          uiLogger.debug("Article marked as read, keeping visible:", article.id);
+          if (!changed) {
+            next = new Set(prev);
+            changed = true;
+          }
+          next.add(article.id);
+        } else if (prevRead === 1 && article.isRead === 0 && prev.has(article.id)) {
+          if (!changed) {
+            next = new Set(prev);
+            changed = true;
+          }
+          next.delete(article.id);
+        }
+
+        nextMap.set(article.id, article.isRead);
+      });
+
+      previousReadState.current = nextMap;
+
+      if (changed) {
+        sessionStorage.setItem(readSessionKey, JSON.stringify(Array.from(next)));
+        return next;
       }
+
+      return prev;
     });
-  }, [articles, readInSession, variant, feedId, freezeQuery]);
+  }, [articles, freezeQuery, readSessionKey]);
 
   // Clear session tracking when navigating to different view
   useEffect(() => {
     // Clear sessionStorage for this view
-    sessionStorage.removeItem(`clarify-read-session-${variant}-${feedId || 'all'}`);
+    sessionStorage.removeItem(readSessionKey);
     setReadInSession(new Set());
-  }, [variant, feedId]);
+    previousReadState.current = new Map();
+  }, [variant, feedId, readSessionKey]);
 
   // Track scroll position before updates
   useEffect(() => {

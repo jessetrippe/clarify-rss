@@ -177,8 +177,9 @@ export async function syncPush(
       env.DB.prepare(
         `INSERT OR REPLACE INTO articles (
           id, feed_id, guid, url, title, content, summary, published_at,
-          is_read, is_starred, created_at, updated_at, is_deleted
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          is_read, is_starred, created_at, updated_at, is_deleted,
+          extraction_status, extraction_error, extracted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         article.id,
         article.feed_id,
@@ -192,7 +193,10 @@ export async function syncPush(
         article.is_starred,
         article.created_at,
         article.updated_at,
-        article.is_deleted
+        article.is_deleted,
+        article.extraction_status || null,
+        article.extraction_error || null,
+        article.extracted_at || null
       )
     );
     articlesProcessed++;

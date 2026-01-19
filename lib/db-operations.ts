@@ -260,6 +260,49 @@ export async function toggleArticleStarred(id: string): Promise<number> {
 
 // deleteArticle removed - not used in application
 
+/**
+ * Update article content after extraction
+ */
+export async function updateArticleContent(
+  id: string,
+  content: string,
+  extractionStatus: 'completed' | 'failed',
+  extractionError?: string
+): Promise<void> {
+  const now = new Date();
+  await db.articles.update(id, {
+    content,
+    extractionStatus,
+    extractionError,
+    extractedAt: now,
+    updatedAt: now,
+  });
+}
+
+/**
+ * Update article extraction status (for tracking progress)
+ */
+export async function updateArticleExtractionStatus(
+  id: string,
+  extractionStatus: 'pending' | 'extracting' | 'completed' | 'failed',
+  extractionError?: string
+): Promise<void> {
+  const updates: Record<string, unknown> = {
+    extractionStatus,
+    updatedAt: new Date(),
+  };
+
+  if (extractionError !== undefined) {
+    updates.extractionError = extractionError;
+  }
+
+  if (extractionStatus === 'completed' || extractionStatus === 'failed') {
+    updates.extractedAt = new Date();
+  }
+
+  await db.articles.update(id, updates);
+}
+
 // ============================================================================
 // SYNC STATE OPERATIONS
 // ============================================================================

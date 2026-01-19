@@ -131,4 +131,9 @@ export const RATE_LIMITS = {
     windowMs: 60000,
     maxRequests: 60,
   },
+  // Article extraction: 20 requests per minute (expensive external fetch)
+  articleExtract: {
+    windowMs: 60000,
+    maxRequests: 20,
+  },
 } as const;

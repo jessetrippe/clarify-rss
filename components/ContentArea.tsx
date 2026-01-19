@@ -22,7 +22,7 @@ export default function ContentArea({ variant, feedId }: ContentAreaProps) {
   }, [router, pathname]);
 
   return (
-    <div className="xl:flex xl:gap-6 xl:h-[calc(100vh-8rem)]">
+    <div className="xl:flex h-screen">
       {/* List pane - fixed width on desktop, hidden on mobile when article is selected */}
       <div className={`xl:w-80 xl:shrink-0 xl:h-full xl:overflow-hidden ${articleId ? "hidden xl:block" : ""}`}>
         <ListPane variant={variant} feedId={feedId} />

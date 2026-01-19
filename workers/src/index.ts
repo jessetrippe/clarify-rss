@@ -2,6 +2,7 @@
 
 import { syncPull, syncPush } from "./sync";
 import { fetchAndParseFeed, discoverFeeds } from "./feed-fetcher";
+import { extractArticleContent } from "./article-extractor";
 import type { Env, SyncPullRequest, SyncPushRequest } from "./types";
 import { checkRateLimit, getClientId, RATE_LIMITS, type RateLimitConfig } from "./rate-limiter";
 
@@ -194,6 +195,34 @@ const handler = {
         return jsonResponse({ feeds }, env);
       }
 
+      // Route: POST /api/articles/extract (extract full article content)
+      if (url.pathname === "/api/articles/extract" && request.method === "POST") {
+        const rateLimitResponse = applyRateLimit(request, env, RATE_LIMITS.articleExtract);
+        if (rateLimitResponse) return rateLimitResponse;
+
+        const body = await parseJsonBody<{ articleId: string; url: string }>(request);
+        if (!body) {
+          return errorResponse("Invalid JSON body", env, 400);
+        }
+        if (!body.url) {
+          return errorResponse("URL required", env, 400);
+        }
+        if (!body.articleId) {
+          return errorResponse("Article ID required", env, 400);
+        }
+        if (!isValidUrl(body.url)) {
+          return errorResponse("Invalid URL format", env, 400);
+        }
+
+        const result = await extractArticleContent(body.url);
+        return jsonResponse({
+          success: result.success,
+          content: result.content,
+          title: result.title,
+          error: result.error,
+        }, env);
+      }
+
       // Route: GET / (root)
       if (url.pathname === "/" && request.method === "GET") {
         return jsonResponse({
@@ -204,6 +233,7 @@ const handler = {
             "POST /api/sync/push",
             "POST /api/feeds/parse",
             "POST /api/feeds/discover",
+            "POST /api/articles/extract",
             "GET /api/health",
           ],
         }, env);

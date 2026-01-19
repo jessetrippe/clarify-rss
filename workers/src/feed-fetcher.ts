@@ -8,6 +8,47 @@ const parser = new Parser({
   maxRedirects: 5,
 });
 
+/**
+ * Decode HTML entities in a string
+ * Handles common entities like &amp; &#8217; etc.
+ */
+function decodeHtmlEntities(text: string): string {
+  if (!text) return text;
+
+  // Named entities
+  const namedEntities: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&apos;': "'",
+    '&nbsp;': ' ',
+    '&mdash;': '\u2014',
+    '&ndash;': '\u2013',
+    '&lsquo;': '\u2018',
+    '&rsquo;': '\u2019',
+    '&ldquo;': '\u201C',
+    '&rdquo;': '\u201D',
+    '&hellip;': '\u2026',
+    '&copy;': '\u00A9',
+    '&reg;': '\u00AE',
+    '&trade;': '\u2122',
+  };
+
+  let result = text;
+
+  // Replace named entities
+  for (const [entity, char] of Object.entries(namedEntities)) {
+    result = result.split(entity).join(char);
+  }
+
+  // Replace numeric entities (&#8217; &#x2019; etc.)
+  result = result.replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
+  result = result.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+  return result;
+}
+
 export interface ParsedFeed {
   title: string;
   url: string;
@@ -52,7 +93,7 @@ export async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
     const articles: ParsedArticle[] = feed.items.map((item) => ({
       guid: item.guid || item.id,
       url: item.link,
-      title: item.title || "Untitled",
+      title: decodeHtmlEntities(item.title || "Untitled"),
       content: item.content || (item as { "content:encoded"?: string })["content:encoded"],
       summary: item.contentSnippet || item.summary,
       publishedAt: item.pubDate
@@ -65,7 +106,7 @@ export async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
     const iconUrl = resolveFeedIconUrl(feed, url);
 
     return {
-      title: feed.title || url,
+      title: decodeHtmlEntities(feed.title || url),
       url,
       iconUrl,
       articles,

@@ -1,34 +1,5 @@
 // Type definitions for Clarify RSS Worker
-
-// D1 Database types (from Cloudflare Workers)
-// These are provided by @cloudflare/workers-types but declared here for standalone compilation
-declare global {
-  interface D1Database {
-    prepare(query: string): D1PreparedStatement;
-    batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
-    exec(query: string): Promise<D1ExecResult>;
-  }
-
-  interface D1PreparedStatement {
-    bind(...values: unknown[]): D1PreparedStatement;
-    first<T = unknown>(colName?: string): Promise<T | null>;
-    run(): Promise<D1Result>;
-    all<T = unknown>(): Promise<D1Result<T>>;
-    raw<T = unknown[]>(): Promise<T[]>;
-  }
-
-  interface D1Result<T = unknown> {
-    results?: T[];
-    success: boolean;
-    error?: string;
-    meta?: object;
-  }
-
-  interface D1ExecResult {
-    count: number;
-    duration: number;
-  }
-}
+// D1 types are provided by @cloudflare/workers-types
 
 export interface Env {
   DB: D1Database;
@@ -61,6 +32,10 @@ export interface Article {
   created_at: number;
   updated_at: number;
   is_deleted: number;
+  // Article extraction fields
+  extraction_status?: string;
+  extraction_error?: string;
+  extracted_at?: number;
 }
 
 export interface SyncPullRequest {

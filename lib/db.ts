@@ -18,6 +18,7 @@ interface RawArticleData {
   createdAt?: Date | string | number;
   updatedAt?: Date | string | number;
   publishedAt?: Date | string | number;
+  extractedAt?: Date | string | number;
 }
 
 /**
@@ -55,6 +56,9 @@ function normalizeDatabaseData(tx: Transaction) {
       if (!article.updatedAt) article.updatedAt = article.createdAt;
       if (article.publishedAt && !(article.publishedAt instanceof Date)) {
         article.publishedAt = new Date(article.publishedAt);
+      }
+      if (article.extractedAt && !(article.extractedAt instanceof Date)) {
+        article.extractedAt = new Date(article.extractedAt);
       }
     }),
   ]);
@@ -94,6 +98,14 @@ export class ClarifyDB extends Dexie {
       feeds: "id, url, isDeleted, updatedAt",
       articles:
         "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted]",
+      syncState: "id",
+    }).upgrade(normalizeDatabaseData);
+
+    // Version 4: Add extraction status fields for full article extraction
+    this.version(4).stores({
+      feeds: "id, url, isDeleted, updatedAt",
+      articles:
+        "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, extractionStatus, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted]",
       syncState: "id",
     }).upgrade(normalizeDatabaseData);
   }

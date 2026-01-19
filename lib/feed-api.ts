@@ -105,3 +105,45 @@ export async function discoverFeedsFromApi(url: string): Promise<string[]> {
 
   return data.feeds;
 }
+
+export interface ExtractArticleResult {
+  success: boolean;
+  content?: string;
+  title?: string;
+  error?: string;
+}
+
+/**
+ * Extract full article content from a URL using the backend API
+ */
+export async function extractArticleContent(
+  articleId: string,
+  url: string
+): Promise<ExtractArticleResult> {
+  const response = await fetchWithTimeout(`${API_URL}/api/articles/extract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ articleId, url }),
+  });
+
+  if (!response.ok) {
+    // Handle rate limiting
+    if (response.status === 429) {
+      const data = await response.json().catch(() => ({}));
+      const retryAfter = data.retryAfter || 60;
+      return {
+        success: false,
+        error: `Rate limited. Please try again in ${retryAfter} seconds.`,
+      };
+    }
+
+    const errorText = await response.text().catch(() => "Unknown error");
+    return {
+      success: false,
+      error: `Failed to extract article (${response.status}): ${errorText}`,
+    };
+  }
+
+  const data = await response.json();
+  return data;
+}

@@ -21,7 +21,7 @@ export default function ListPaneHeader({
   const isRefreshing = useRefreshState();
 
   return (
-    <div className="flex justify-between items-center mb-6 gap-4">
+    <div className="flex justify-between items-center mb-4 gap-4">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <button
           type="button"

@@ -134,6 +134,10 @@ export class SyncService {
               createdAt: new Date(normalizeTimestamp(article.created_at)),
               updatedAt: new Date(serverUpdatedAt),
               isDeleted: typeof article.is_deleted === "number" ? article.is_deleted : 0,
+              // Extraction fields
+              extractionStatus: article.extraction_status as Article['extractionStatus'],
+              extractionError: article.extraction_error,
+              extractedAt: article.extracted_at ? new Date(normalizeTimestamp(article.extracted_at)) : undefined,
             });
           }
         }
@@ -233,6 +237,10 @@ export class SyncService {
         created_at: a.createdAt.getTime(),
         updated_at: a.updatedAt.getTime(),
         is_deleted: a.isDeleted,
+        // Extraction fields
+        extraction_status: a.extractionStatus,
+        extraction_error: a.extractionError,
+        extracted_at: a.extractedAt?.getTime(),
       }));
 
       // Push to server

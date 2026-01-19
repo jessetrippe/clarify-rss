@@ -27,6 +27,10 @@ export interface Article {
   createdAt: Date;
   updatedAt: Date;
   isDeleted: number;
+  // Article extraction fields
+  extractionStatus?: 'pending' | 'extracting' | 'completed' | 'failed';
+  extractionError?: string;
+  extractedAt?: Date;
 }
 
 export interface SyncState {
