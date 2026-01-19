@@ -7,6 +7,44 @@ import { getSyncState, updateSyncState } from "./db-operations";
 // API base URL (localhost for development, will be replaced with actual domain in production)
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787";
 
+// Maximum number of sync iterations to prevent infinite loops
+const MAX_SYNC_ITERATIONS = 100;
+
+// Request timeout in milliseconds
+const REQUEST_TIMEOUT_MS = 30000;
+
+/**
+ * Normalize timestamp to milliseconds
+ * Handles both milliseconds and seconds timestamps
+ */
+function normalizeTimestamp(timestamp: number | undefined): number {
+  if (!timestamp) return 0;
+  // If timestamp is less than year 2000 in milliseconds, assume it's in seconds
+  // Year 2000 in ms = 946684800000, in seconds = 946684800
+  if (timestamp < 946684800000) {
+    return timestamp * 1000;
+  }
+  return timestamp;
+}
+
+/**
+ * Fetch with timeout
+ */
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /**
  * Sync service for coordinating local and remote data
  */
@@ -27,9 +65,12 @@ export class SyncService {
       let totalFeeds = 0;
       let totalArticles = 0;
       let hasMore = true;
+      let iterations = 0;
 
-      while (hasMore) {
-        const response = await fetch(`${API_BASE_URL}/api/sync/pull`, {
+      while (hasMore && iterations < MAX_SYNC_ITERATIONS) {
+        iterations++;
+
+        const response = await fetchWithTimeout(`${API_BASE_URL}/api/sync/pull`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -52,19 +93,25 @@ export class SyncService {
           hasMore: nextHasMore,
         } = data;
 
+        // Detect potential infinite loop (same cursors returned)
+        if (newFeedCursor === feedCursor && newArticleCursor === articleCursor && nextHasMore) {
+          throw new Error("Sync loop detected: cursors not advancing");
+        }
+
         // Merge feeds into local database
         for (const feed of feeds) {
           const existing = await db.feeds.get(feed.id);
           const localUpdatedAt = existing?.updatedAt?.getTime() ?? 0;
+          const serverUpdatedAt = normalizeTimestamp(feed.updated_at);
 
           // Only update if server version is newer or doesn't exist locally
-          if (!existing || localUpdatedAt < feed.updated_at) {
+          if (!existing || localUpdatedAt < serverUpdatedAt) {
             await db.feeds.put({
               ...feed,
               iconUrl: existing?.iconUrl,
-              lastFetchedAt: feed.last_fetched_at ? new Date(feed.last_fetched_at) : undefined,
-              createdAt: new Date(feed.created_at),
-              updatedAt: new Date(feed.updated_at),
+              lastFetchedAt: feed.last_fetched_at ? new Date(normalizeTimestamp(feed.last_fetched_at)) : undefined,
+              createdAt: new Date(normalizeTimestamp(feed.created_at)),
+              updatedAt: new Date(serverUpdatedAt),
               isDeleted: typeof feed.is_deleted === "number" ? feed.is_deleted : 0,
             });
           }
@@ -74,17 +121,18 @@ export class SyncService {
         for (const article of articles) {
           const existing = await db.articles.get(article.id);
           const localUpdatedAt = existing?.updatedAt?.getTime() ?? 0;
+          const serverUpdatedAt = normalizeTimestamp(article.updated_at);
 
           // Only update if server version is newer or doesn't exist locally
-          if (!existing || localUpdatedAt < article.updated_at) {
+          if (!existing || localUpdatedAt < serverUpdatedAt) {
             await db.articles.put({
               ...article,
               feedId: article.feed_id,
-              publishedAt: article.published_at ? new Date(article.published_at) : undefined,
+              publishedAt: article.published_at ? new Date(normalizeTimestamp(article.published_at)) : undefined,
               isRead: typeof article.is_read === "number" ? article.is_read : 0,
               isStarred: typeof article.is_starred === "number" ? article.is_starred : 0,
-              createdAt: new Date(article.created_at),
-              updatedAt: new Date(article.updated_at),
+              createdAt: new Date(normalizeTimestamp(article.created_at)),
+              updatedAt: new Date(serverUpdatedAt),
               isDeleted: typeof article.is_deleted === "number" ? article.is_deleted : 0,
             });
           }
@@ -95,6 +143,10 @@ export class SyncService {
         feedCursor = newFeedCursor;
         articleCursor = newArticleCursor;
         hasMore = nextHasMore;
+      }
+
+      if (iterations >= MAX_SYNC_ITERATIONS) {
+        console.warn("Sync pull reached maximum iterations limit");
       }
 
       // Update sync state
@@ -110,12 +162,23 @@ export class SyncService {
         articlesCount: totalArticles,
       };
     } catch (error) {
-      console.error("Sync pull error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      // Don't log network errors (expected when backend is unavailable)
+      const isNetworkError =
+        error instanceof Error &&
+        (error.name === "AbortError" ||
+          error.message.includes("Failed to fetch") ||
+          error.message.includes("NetworkError") ||
+          error.message.includes("Network request failed"));
+
+      if (!isNetworkError) {
+        console.error("Sync pull error:", errorMessage);
+      }
       return {
         success: false,
         feedsCount: 0,
         articlesCount: 0,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
       };
     }
   }
@@ -173,7 +236,7 @@ export class SyncService {
       }));
 
       // Push to server
-      const response = await fetch(`${API_BASE_URL}/api/sync/push`, {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/api/sync/push`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -190,10 +253,21 @@ export class SyncService {
 
       return { success: result.success };
     } catch (error) {
-      console.error("Sync push error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      // Don't log network errors (expected when backend is unavailable)
+      const isNetworkError =
+        error instanceof Error &&
+        (error.name === "AbortError" ||
+          error.message.includes("Failed to fetch") ||
+          error.message.includes("NetworkError") ||
+          error.message.includes("Network request failed"));
+
+      if (!isNetworkError) {
+        console.error("Sync push error:", errorMessage);
+      }
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
       };
     }
   }

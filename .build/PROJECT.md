@@ -2,11 +2,53 @@
 
 **Project:** Clarify RSS - Personal, plaintext RSS reader
 **Created:** 2026-01-12
-**Status:** In Development (Phases 0-6 implemented; Phase 7 pending)
+**Status:** In Development (Phases 0-6 implemented; Phase 7 partially complete)
 
 ---
 
-## Progress Update (2026-01-13)
+## Progress Update (2026-01-18)
+
+### Code Review & Security Hardening Complete
+
+A comprehensive code review was performed and all identified issues have been fixed:
+
+#### Critical Security Fixes
+- **CORS restriction** - Changed from wildcard `"*"` to environment-based origin restriction via `ALLOWED_ORIGIN` variable
+- **Input validation** - Added URL validation and JSON body parsing with proper error handling throughout the worker
+- **HTML sanitization** - Fixed XSS vulnerability by re-sanitizing after DOM modifications instead of using regex replacement
+- **Rate limiting** - Added per-endpoint rate limiting to worker API
+
+#### Data Integrity Fixes
+- **Race condition** - Wrapped `addArticle` in a Dexie transaction to prevent concurrent write issues
+- **Timestamp normalization** - Added `normalizeTimestamp()` to handle both seconds and milliseconds from different sources
+- **Cursor encoding** - Changed to base64 JSON encoding to safely handle IDs containing special characters
+- **Article sorting** - Fixed sorting to properly return newest-first order
+
+#### Performance & Reliability
+- **Request timeouts** - Added 30-second timeouts to all API calls
+- **Retry logic** - Added exponential backoff for feed fetching with transient error detection
+- **Sync batching** - Batched D1 database operations for better performance
+- **Cache TTL** - Added time-based cache invalidation
+
+#### Memory & Resource Management
+- **Timeout cleanup** - Properly cleanup timeouts on component unmount using refs
+- **Hydration fixes** - Fixed SSR hydration mismatches in refresh state hook
+
+#### Code Quality
+- **Logger utility** - Replaced `console.log` with environment-aware logging (silent in production)
+- **TypeScript types** - Fixed type definitions, removed `any` types where possible
+- **Suspense boundaries** - Added Suspense wrappers to pages using `useSearchParams()`
+- **Next.js 16 compatibility** - Fixed deprecated config options
+
+### New Utility Files Added
+- `lib/logger.ts` - Environment-aware logging utility
+- `lib/validation.ts` - URL and string validation functions
+- `lib/retry.ts` - Retry with exponential backoff
+- `workers/src/rate-limiter.ts` - Rate limiting for worker endpoints
+
+---
+
+## Previous Progress (2026-01-13)
 
 - Two-pane split layout with sidebar navigation and list/detail views
 - Settings moved to `/settings` with feeds management inside
@@ -835,62 +877,74 @@ Use this section to document key decisions made during implementation.
 Use this checklist to verify functionality at the end of the project.
 
 ### Feed Management
-- [ ] Can add feed by URL
-- [ ] Feed auto-discovery finds feeds
-- [ ] Can import OPML
-- [ ] Can export OPML
-- [ ] Can view feed list
-- [ ] Can view articles by feed
-- [ ] Can delete feed
+- [x] Can add feed by URL
+- [x] Feed auto-discovery finds feeds
+- [x] Can import OPML
+- [x] Can export OPML
+- [x] Can view feed list
+- [x] Can view articles by feed
+- [x] Can delete feed
 
 ### Article Reading
-- [ ] Can view all articles
-- [ ] Can view starred articles
-- [ ] Can open article detail
-- [ ] Article HTML renders safely
-- [ ] Images load with lazy loading
-- [ ] Can mark read/unread
-- [ ] Can star/unstar
-- [ ] Opening article auto-marks read
-- [ ] Copy Content works for long articles
+- [x] Can view all articles
+- [x] Can view starred articles
+- [x] Can open article detail
+- [x] Article HTML renders safely
+- [x] Images load with lazy loading
+- [x] Can mark read/unread
+- [x] Can star/unstar
+- [x] Opening article auto-marks read
+- [x] Copy Content works for long articles
 
 ### Sync
-- [ ] Sync works on app open
-- [ ] Sync works on app focus
-- [ ] Changes sync across devices (test on Mac + iPhone)
-- [ ] Conflict resolution works (test simultaneous edits)
-- [ ] Sync indicator shows during sync
+- [x] Sync works on app open
+- [x] Sync works on app focus
+- [ ] Changes sync across devices (test on Mac + iPhone - requires production)
+- [x] Conflict resolution works (test simultaneous edits)
+- [x] Sync indicator shows during sync
 - [ ] Last sync time displayed
 
 ### Feed Refresh
-- [ ] Feeds refresh on sync
-- [ ] New articles appear
-- [ ] Existing articles update
-- [ ] User state preserved (read/starred)
-- [ ] Rate limiting enforced (5-minute minimum)
-- [ ] Error handling for failed feeds
+- [x] Feeds refresh on sync
+- [x] New articles appear
+- [x] Existing articles update
+- [x] User state preserved (read/starred)
+- [x] Rate limiting enforced (5-minute minimum)
+- [x] Error handling for failed feeds (with retry logic)
 
 ### PWA & Offline
-- [ ] App installable on iOS
-- [ ] App installable on desktop
-- [ ] App works offline (cached data)
-- [ ] Offline indicator shows when offline
-- [ ] Service Worker caches assets
-- [ ] Icons display correctly
+- [x] App installable on iOS
+- [x] App installable on desktop
+- [x] App works offline (cached data)
+- [x] Offline indicator shows when offline
+- [x] Service Worker caches assets
+- [x] Icons display correctly
 
 ### Security
 - [ ] Cloudflare Access protects all routes
-- [ ] DOMPurify sanitizes all HTML
+- [x] DOMPurify sanitizes all HTML (re-sanitizes after DOM modifications)
 - [ ] CSP policy enforced
-- [ ] External links have noopener/noreferrer
-- [ ] No XSS vulnerabilities
-- [ ] HTTPS only
+- [x] External links have noopener/noreferrer
+- [x] No XSS vulnerabilities (fixed sanitization security issue)
+- [ ] HTTPS only (requires production deployment)
+- [x] CORS restricted to specific origin (not wildcard)
+- [x] Input validation on all API endpoints
+- [x] Rate limiting on worker endpoints
 
 ### Performance
 - [ ] Feed list renders <100ms
 - [ ] Article opens <200ms
-- [ ] Sync completes <5s
+- [ ] Sync completes <5s (with retry logic and timeouts)
 - [ ] App loads <1s on repeat visits
+
+### Code Quality (Phase 7 Partial)
+- [x] Environment-aware logging (no console.log in production)
+- [x] TypeScript strict mode, no `any` types where possible
+- [x] Request timeouts on all API calls
+- [x] Exponential backoff retry for transient errors
+- [x] Race condition prevention with transactions
+- [x] Memory leak prevention (timeout cleanup)
+- [x] Hydration-safe state management
 
 ---
 

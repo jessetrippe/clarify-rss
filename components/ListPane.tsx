@@ -12,6 +12,7 @@ import type { Article, Feed } from "@/lib/types";
 import ArticleList from "@/components/ArticleList";
 import ListPaneHeader from "@/components/ListPaneHeader";
 import EmptyArticleList from "@/components/EmptyArticleList";
+import { uiLogger } from "@/lib/logger";
 
 type ListVariant = "all" | "starred" | "feed";
 
@@ -181,7 +182,7 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
   // Memoize visible articles calculation to prevent unnecessary filtering
   const visibleArticles = useMemo(() => {
-    console.log('[ListPane] Filtering articles. showRead:', showRead, 'readInSession size:', readInSession.size, 'total articles:', resolvedArticles.length);
+    uiLogger.debug('Filtering articles. showRead:', showRead, 'readInSession size:', readInSession.size, 'total articles:', resolvedArticles.length);
 
     if (showRead) return resolvedArticles;
 
@@ -190,7 +191,7 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
       article.isRead === 0 || readInSession.has(article.id)
     );
 
-    console.log('[ListPane] Visible articles after filter:', filtered.length);
+    uiLogger.debug('Visible articles after filter:', filtered.length);
     return filtered;
   }, [resolvedArticles, showRead, readInSession]);
 
@@ -200,7 +201,7 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
     articles.forEach(article => {
       if (article.isRead === 1 && !readInSession.has(article.id)) {
-        console.log('[ListPane] Article marked as read, keeping visible:', article.id);
+        uiLogger.debug('Article marked as read, keeping visible:', article.id);
         setReadInSession(prev => {
           const newSet = new Set(prev).add(article.id);
           // Persist to sessionStorage
@@ -225,7 +226,6 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) {
-      console.log('[ListPane] Scroll container ref not found');
       return;
     }
 
@@ -234,17 +234,14 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
     const savedScroll = sessionStorage.getItem(scrollKey);
     if (savedScroll) {
       const scrollPos = parseInt(savedScroll, 10);
-      console.log('[ListPane] Restoring scroll from sessionStorage:', scrollPos);
       container.scrollTop = scrollPos;
       lastScrollPosition.current = scrollPos;
     }
 
-    console.log('[ListPane] Attached scroll listener to container');
     const handleScroll = () => {
       lastScrollPosition.current = container.scrollTop;
       // Persist to sessionStorage
       sessionStorage.setItem(scrollKey, container.scrollTop.toString());
-      console.log('[ListPane] Scroll position saved:', container.scrollTop);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -257,13 +254,11 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
     if (!container) return;
 
     const savedPos = lastScrollPosition.current;
-    console.log('[ListPane] visibleArticles changed, count:', visibleArticles.length, 'savedPos:', savedPos);
 
     // Only restore if we have articles and a saved position
     if (visibleArticles.length === 0 || savedPos === 0) return;
 
     // Run immediately before paint, no requestAnimationFrame
-    console.log('[ListPane] Restoring scroll to:', savedPos);
     container.scrollTop = savedPos;
   }, [visibleArticles.length]); // Only depend on length, not the array itself
 

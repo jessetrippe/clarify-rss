@@ -3,10 +3,30 @@
 import Dexie, { type EntityTable, type Transaction } from "dexie";
 import type { Feed, Article, SyncState } from "./types";
 
-// Helper function to normalize data during migrations
+// Type for raw feed data during migrations (before normalization)
+interface RawFeedData {
+  isDeleted?: boolean | number;
+  createdAt?: Date | string | number;
+  updatedAt?: Date | string | number;
+}
+
+// Type for raw article data during migrations (before normalization)
+interface RawArticleData {
+  isDeleted?: boolean | number;
+  isRead?: boolean | number;
+  isStarred?: boolean | number;
+  createdAt?: Date | string | number;
+  updatedAt?: Date | string | number;
+  publishedAt?: Date | string | number;
+}
+
+/**
+ * Helper function to normalize data during migrations
+ * Converts boolean flags to numeric (0/1) and ensures dates are Date objects
+ */
 function normalizeDatabaseData(tx: Transaction) {
   return Promise.all([
-    tx.table("feeds").toCollection().modify((feed: any) => {
+    tx.table("feeds").toCollection().modify((feed: RawFeedData) => {
       if (typeof feed.isDeleted === "boolean") feed.isDeleted = feed.isDeleted ? 1 : 0;
       if (typeof feed.isDeleted !== "number") feed.isDeleted = 0;
       if (feed.createdAt && !(feed.createdAt instanceof Date)) {
@@ -18,7 +38,7 @@ function normalizeDatabaseData(tx: Transaction) {
       }
       if (!feed.updatedAt) feed.updatedAt = feed.createdAt;
     }),
-    tx.table("articles").toCollection().modify((article: any) => {
+    tx.table("articles").toCollection().modify((article: RawArticleData) => {
       if (typeof article.isDeleted === "boolean") article.isDeleted = article.isDeleted ? 1 : 0;
       if (typeof article.isDeleted !== "number") article.isDeleted = 0;
       if (typeof article.isRead === "boolean") article.isRead = article.isRead ? 1 : 0;

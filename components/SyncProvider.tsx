@@ -5,6 +5,7 @@ import { syncService } from "@/lib/sync-service";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { feedRefreshService } from "@/lib/feed-refresh-service";
 import { setGlobalRefreshState } from "@/hooks/useFeedRefreshState";
+import { syncLogger } from "@/lib/logger";
 
 interface SyncProviderProps {
   children: ReactNode;
@@ -31,24 +32,23 @@ export default function SyncProvider({ children }: SyncProviderProps) {
     }
 
     const performFullSync = async (force = false) => {
-      console.log("[SyncProvider] performFullSync called, force:", force, "syncInFlight:", syncInFlight.current);
+      syncLogger.debug("performFullSync called, force:", force, "syncInFlight:", syncInFlight.current);
 
       if (syncInFlight.current) {
-        console.log("[SyncProvider] Sync already in flight, skipping");
+        syncLogger.debug("Sync already in flight, skipping");
         return;
       }
 
       // Check if enough time has passed since last sync (unless forced)
       if (!force) {
         const timeSinceLastSync = Date.now() - lastSyncTime.current;
-        console.log("[SyncProvider] Time since last sync:", timeSinceLastSync, "ms");
         if (timeSinceLastSync < MIN_SYNC_INTERVAL_MS) {
-          console.log("[SyncProvider] Too soon to sync, skipping");
+          syncLogger.debug("Too soon to sync, skipping");
           return;
         }
       }
 
-      console.log("[SyncProvider] Starting full sync...");
+      syncLogger.debug("Starting full sync...");
       syncInFlight.current = true;
 
       try {
@@ -56,11 +56,11 @@ export default function SyncProvider({ children }: SyncProviderProps) {
         setGlobalRefreshState(true);
 
         // Step 2: Refresh all feeds (fetch new articles)
-        console.log("[SyncProvider] Refreshing feeds...");
+        syncLogger.debug("Refreshing feeds...");
         await feedRefreshService.refreshAllFeeds();
 
         // Step 3: Sync state with backend (read/starred changes)
-        console.log("[SyncProvider] Syncing state with backend...");
+        syncLogger.debug("Syncing state with backend...");
         await syncService.sync();
 
         // Step 4: Update last sync time
@@ -68,9 +68,17 @@ export default function SyncProvider({ children }: SyncProviderProps) {
 
         // Step 5: Clear refresh state
         setGlobalRefreshState(false);
-        console.log("[SyncProvider] Sync complete");
+        syncLogger.debug("Sync complete");
       } catch (error) {
-        console.error("Sync failed:", error);
+        // Don't log network errors (expected when backend is unavailable)
+        const isNetworkError =
+          error instanceof Error &&
+          (error.message.includes("Failed to fetch") ||
+            error.message.includes("NetworkError"));
+
+        if (!isNetworkError) {
+          syncLogger.error("Sync failed:", error);
+        }
         setGlobalRefreshState(false);
       } finally {
         syncInFlight.current = false;

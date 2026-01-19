@@ -7,7 +7,7 @@ import {
   getFeedByUrl,
   updateFeed,
 } from "@/lib/db-operations";
-import { parseFeedFromApi, discoverFeedsFromApi, type FeedArticleData } from "@/lib/feed-api";
+import { parseFeedFromApi, discoverFeedsFromApi, type FeedArticleData, type FeedData } from "@/lib/feed-api";
 
 interface OPMLImportProps {
   onSuccess?: () => void;
@@ -89,7 +89,7 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
           }
 
           // Parse and add feed (try direct parse, then discovery)
-          let feedData: { title: string; articles: any[] } | undefined;
+          let feedData: FeedData | undefined;
           let feedUrl = url;
 
           try {

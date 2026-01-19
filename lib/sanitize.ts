@@ -5,15 +5,19 @@ import DOMPurify from "dompurify";
 /**
  * Sanitize HTML content for safe rendering
  * Strips dangerous tags and adds security attributes
+ *
+ * IMPORTANT: This function must only be called on the client side.
+ * Server-side rendering should handle content differently.
  */
 export function sanitizeHTML(html: string): string {
   if (typeof window === "undefined") {
     // Server-side: return empty string (will be sanitized on client)
+    // This is expected behavior for SSR - content renders on hydration
     return "";
   }
 
-  // Configure DOMPurify
-  const config: DOMPurify.Config = {
+  // Configure DOMPurify with strict settings
+  const config = {
     // Allow only safe tags
     ALLOWED_TAGS: [
       "p",
@@ -45,26 +49,40 @@ export function sanitizeHTML(html: string): string {
       "tr",
       "td",
       "th",
+      "figure",
+      "figcaption",
     ],
-    // Allow safe attributes
-    ALLOWED_ATTR: ["href", "src", "alt", "title", "class"],
-    // Add target and rel to links
-    ADD_ATTR: ["target", "rel"],
+    // Allow only safe attributes - explicitly list what's allowed
+    ALLOWED_ATTR: ["href", "src", "alt", "title", "class", "loading", "target", "rel"],
+    // Forbid data: and javascript: URLs
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+    // Don't allow data attributes which could contain malicious content
+    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur"],
   };
 
-  // Sanitize HTML
-  let sanitized = DOMPurify.sanitize(html, config);
+  // First pass: sanitize HTML
+  let sanitized = DOMPurify.sanitize(html, config) as string;
 
-  // Post-process: add lazy loading to images
-  sanitized = sanitized.replace(/<img /g, '<img loading="lazy" ');
+  // Use DOMPurify hooks for safe attribute addition instead of regex
+  // This avoids potential XSS from regex replacement on sanitized content
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = sanitized;
 
-  // Post-process: ensure all links open in new tab with security attributes
-  sanitized = sanitized.replace(
-    /<a /g,
-    '<a target="_blank" rel="noopener noreferrer" '
-  );
+  // Add lazy loading to images
+  const images = tempDiv.querySelectorAll("img");
+  images.forEach((img) => {
+    img.setAttribute("loading", "lazy");
+  });
 
-  return sanitized;
+  // Ensure all links open in new tab with security attributes
+  const links = tempDiv.querySelectorAll("a");
+  links.forEach((link) => {
+    link.setAttribute("target", "_blank");
+    link.setAttribute("rel", "noopener noreferrer");
+  });
+
+  // Final sanitization pass to ensure our modifications are safe
+  return DOMPurify.sanitize(tempDiv.innerHTML, config) as string;
 }
 
 /**

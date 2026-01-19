@@ -11,6 +11,7 @@ const parser = new Parser({
 export interface ParsedFeed {
   title: string;
   url: string;
+  iconUrl?: string;
   articles: ParsedArticle[];
 }
 

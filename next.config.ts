@@ -3,12 +3,10 @@ import withPWA from "@ducanh2912/next-pwa";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  devIndicators: {
-    buildActivityPosition: "bottom-right",
-  },
 };
 
-export default withPWA({
+// PWA configuration - use type assertion for options that may not be in type definitions
+const pwaConfig = {
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
@@ -16,7 +14,6 @@ export default withPWA({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
-  swcMinify: true,
   workboxOptions: {
     disableDevLogs: true,
     runtimeCaching: [
@@ -159,4 +156,7 @@ export default withPWA({
       },
     ],
   },
-})(nextConfig);
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default withPWA(pwaConfig as any)(nextConfig);

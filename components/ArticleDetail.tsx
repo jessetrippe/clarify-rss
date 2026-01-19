@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
 import { format } from "date-fns";
 import {
   getArticleById,
@@ -28,9 +27,6 @@ interface ArticleDetailProps {
 }
 
 export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-
   // Initialize state from cache for instant rendering
   const [articleState, setArticleState] = useState<{
     article: Article | null;
@@ -47,6 +43,16 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
 
   const { article, feed, isLoading } = articleState;
   const [copyStatus, setCopyStatus] = useState<string>("");
+  const copyStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyStatusTimeoutRef.current) {
+        clearTimeout(copyStatusTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -125,7 +131,7 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
     );
   }
 
-  const handleToggleStarred = async () => {
+  const handleToggleStarred = useCallback(async () => {
     if (!article) return;
 
     try {
@@ -134,12 +140,12 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
         ...prev,
         article: prev.article ? { ...prev.article, isStarred: newStarredState } : null,
       }));
-    } catch (error) {
-      console.error("Error toggling starred:", error);
+    } catch {
+      // Error handling - state remains unchanged
     }
-  };
+  }, [article]);
 
-  const handleToggleRead = async () => {
+  const handleToggleRead = useCallback(async () => {
     if (!article) return;
 
     try {
@@ -148,13 +154,18 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
         ...prev,
         article: prev.article ? { ...prev.article, isRead: newReadState } : null,
       }));
-    } catch (error) {
-      console.error("Error toggling read:", error);
+    } catch {
+      // Error handling - state remains unchanged
     }
-  };
+  }, [article]);
 
-  const handleCopyContent = async () => {
+  const handleCopyContent = useCallback(async () => {
     if (!article) return;
+
+    // Clear any existing timeout
+    if (copyStatusTimeoutRef.current) {
+      clearTimeout(copyStatusTimeoutRef.current);
+    }
 
     setCopyStatus("Copying...");
 
@@ -167,12 +178,12 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
 
     if (result.success) {
       setCopyStatus("✓ Copied to clipboard!");
-      setTimeout(() => setCopyStatus(""), 3000);
+      copyStatusTimeoutRef.current = setTimeout(() => setCopyStatus(""), 3000);
     } else {
       setCopyStatus(`✗ ${result.error}`);
-      setTimeout(() => setCopyStatus(""), 5000);
+      copyStatusTimeoutRef.current = setTimeout(() => setCopyStatus(""), 5000);
     }
-  };
+  }, [article]);
 
   // Only show loading skeleton if we don't have cached data
   if (isLoading && !article) {

@@ -1,6 +1,8 @@
 import { getAllFeeds, addArticle, updateFeed } from "./db-operations";
 import { parseFeedFromApi } from "./feed-api";
 import type { Feed } from "./types";
+import { feedLogger } from "./logger";
+import { withRetry, isTransientError } from "./retry";
 
 // Minimum time between feed refreshes (5 minutes)
 const MIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -25,10 +27,10 @@ export class FeedRefreshService {
   async refreshAllFeeds(
     onProgress?: RefreshCallback
   ): Promise<{ success: boolean; errors: RefreshProgress["errors"] }> {
-    console.log("[FeedRefreshService] refreshAllFeeds called, isRefreshing:", this.isRefreshing);
+    feedLogger.debug("refreshAllFeeds called, isRefreshing:", this.isRefreshing);
 
     if (this.isRefreshing) {
-      console.log("[FeedRefreshService] Already refreshing, skipping");
+      feedLogger.debug("Already refreshing, skipping");
       return {
         success: false,
         errors: [
@@ -42,7 +44,7 @@ export class FeedRefreshService {
     try {
       // Get all user's feeds
       const feeds = await getAllFeeds();
-      console.log("[FeedRefreshService] Found", feeds.length, "feeds to refresh");
+      feedLogger.debug("Found", feeds.length, "feeds to refresh");
       const errors: RefreshProgress["errors"] = [];
 
       // Notify start
@@ -67,8 +69,15 @@ export class FeedRefreshService {
               }
             }
 
-            // Fetch and parse feed
-            const feedData = await parseFeedFromApi(feed.url);
+            // Fetch and parse feed with retry for transient errors
+            const feedData = await withRetry(
+              () => parseFeedFromApi(feed.url),
+              {
+                maxRetries: 2,
+                initialDelayMs: 1000,
+                shouldRetry: isTransientError,
+              }
+            );
 
             // Add articles (addArticle handles duplicates via stable ID generation)
             const articlePromises = feedData.articles.map((article) =>

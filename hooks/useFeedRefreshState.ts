@@ -10,9 +10,13 @@ export function setGlobalRefreshState(isRefreshing: boolean) {
 }
 
 export function useRefreshState(): boolean {
-  const [isRefreshing, setIsRefreshing] = useState(globalRefreshState);
+  // Always start with false to match server-side render and prevent hydration mismatch
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
+    // Sync to actual global state after hydration
+    setIsRefreshing(globalRefreshState);
+
     const listener = (state: boolean) => setIsRefreshing(state);
     listeners.add(listener);
     return () => {

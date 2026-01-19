@@ -92,11 +92,17 @@ export async function deleteFeed(id: string): Promise<void> {
  * Get all articles (excluding deleted), sorted by published date (newest first)
  */
 export async function getAllArticles(): Promise<Article[]> {
-  return db.articles
+  const articles = await db.articles
     .where("isDeleted")
     .equals(0)
-    .reverse()
-    .sortBy("publishedAt");
+    .toArray();
+
+  // Sort by publishedAt descending (newest first), with null/undefined at the end
+  return articles.sort((a, b) => {
+    const aTime = a.publishedAt?.getTime() ?? 0;
+    const bTime = b.publishedAt?.getTime() ?? 0;
+    return bTime - aTime;
+  });
 }
 
 /**
@@ -104,22 +110,35 @@ export async function getAllArticles(): Promise<Article[]> {
  */
 export async function getArticlesByFeed(feedId: string): Promise<Article[]> {
   if (!feedId) return [];
-  return db.articles
+
+  const articles = await db.articles
     .where("[feedId+isDeleted]")
     .equals([feedId, 0])
-    .reverse()
-    .sortBy("publishedAt");
+    .toArray();
+
+  // Sort by publishedAt descending (newest first)
+  return articles.sort((a, b) => {
+    const aTime = a.publishedAt?.getTime() ?? 0;
+    const bTime = b.publishedAt?.getTime() ?? 0;
+    return bTime - aTime;
+  });
 }
 
 /**
  * Get starred articles
  */
 export async function getStarredArticles(): Promise<Article[]> {
-  return db.articles
+  const articles = await db.articles
     .where("[isStarred+isDeleted]")
     .equals([1, 0])
-    .reverse()
-    .sortBy("publishedAt");
+    .toArray();
+
+  // Sort by publishedAt descending (newest first)
+  return articles.sort((a, b) => {
+    const aTime = a.publishedAt?.getTime() ?? 0;
+    const bTime = b.publishedAt?.getTime() ?? 0;
+    return bTime - aTime;
+  });
 }
 
 // getUnreadArticles removed - use getAllArticles and filter in component
@@ -135,6 +154,7 @@ export async function getArticleById(
 
 /**
  * Add a new article (or update if it already exists)
+ * Uses a transaction to prevent race conditions
  */
 export async function addArticle(params: {
   feedId: string;
@@ -156,40 +176,42 @@ export async function addArticle(params: {
     publishedAt: params.publishedAt,
   });
 
-  // Check if article already exists
-  const existing = await db.articles.get(id);
+  // Use transaction to prevent race conditions between check and update/insert
+  return db.transaction("rw", db.articles, async () => {
+    const existing = await db.articles.get(id);
 
-  if (existing) {
-    // Update existing article (but preserve user state: isRead, isStarred)
-    await db.articles.update(id, {
+    if (existing) {
+      // Update existing article (but preserve user state: isRead, isStarred)
+      await db.articles.update(id, {
+        title: params.title,
+        content: params.content,
+        summary: params.summary,
+        publishedAt: params.publishedAt,
+        updatedAt: now,
+      });
+      return (await db.articles.get(id))!;
+    }
+
+    // Create new article
+    const article: Article = {
+      id,
+      feedId: params.feedId,
+      guid: params.guid,
+      url: params.url,
       title: params.title,
       content: params.content,
       summary: params.summary,
       publishedAt: params.publishedAt,
+      isRead: 0,
+      isStarred: 0,
+      createdAt: now,
       updatedAt: now,
-    });
-    return (await db.articles.get(id))!;
-  }
+      isDeleted: 0,
+    };
 
-  // Create new article
-  const article: Article = {
-    id,
-    feedId: params.feedId,
-    guid: params.guid,
-    url: params.url,
-    title: params.title,
-    content: params.content,
-    summary: params.summary,
-    publishedAt: params.publishedAt,
-    isRead: 0,
-    isStarred: 0,
-    createdAt: now,
-    updatedAt: now,
-    isDeleted: 0,
-  };
-
-  await db.articles.add(article);
-  return article;
+    await db.articles.add(article);
+    return article;
+  });
 }
 
 /**
