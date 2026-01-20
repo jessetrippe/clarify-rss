@@ -178,9 +178,11 @@ export default function Settings() {
           </h2>
 
           {feeds.length === 0 ? (
-            <div className={emptyStateClass}>
-              <p className="text-base mb-1">No feeds yet</p>
-              <p className="text-sm">Add your first RSS feed above to get started</p>
+            <div className={`${emptyStateClass} flex flex-col items-center`}>
+              <p className="text-base font-medium mb-1">No feeds yet</p>
+              <p className="text-sm text-[var(--muted)]">
+                Add your first RSS feed above to get started
+              </p>
             </div>
           ) : (
             <div className="border-t border-[var(--border)]">

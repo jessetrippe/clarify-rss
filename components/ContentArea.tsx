@@ -31,7 +31,7 @@ export default function ContentArea({ variant, feedId }: ContentAreaProps) {
 
       {/* Article detail or placeholder */}
       {articleId ? (
-        <div className="flex-1 xl:border-l xl:border-gray-200 xl:dark:border-gray-800 xl:pl-6 xl:pt-6 xl:overflow-y-auto">
+        <div className="flex-1 xl:border-l xl:border-gray-200 xl:dark:border-gray-800 px-6 py-6 xl:overflow-y-auto">
           <ArticleDetail articleId={articleId} onBack={handleBack} />
         </div>
       ) : (

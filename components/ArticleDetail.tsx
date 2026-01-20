@@ -365,10 +365,39 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
         </button>
       </div>
 
-      {/* Article Header */}
-      <article className="max-w-2xl mx-auto">
-        <header className="mb-8 pb-6 border-b border-[var(--border)]">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4 leading-tight tracking-tight text-balance">
+      {/* Toasts */}
+      {copyStatus && (
+        <Toast tone={copyStatus.startsWith("✓") ? "success" : "error"}>
+          {copyStatus}
+        </Toast>
+      )}
+      {extractionState.isExtracting && (
+        <Toast tone="info">
+          <span className="inline-flex items-center gap-2">
+            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Fetching full article
+          </span>
+        </Toast>
+      )}
+      {extractionState.error && !extractionState.isExtracting && (
+        <Toast
+          tone="warning"
+          actionLabel="Try again"
+          onAction={() => {
+            extractionAttemptedRef.current = null;
+            handleExtractContent();
+          }}
+        >
+          <span className="font-medium">{extractionState.error}</span>
+        </Toast>
+      )}
+
+      <article className="prose dark:prose-invert prose-lg max-w-2xl mx-auto font-serif prose-headings:font-sans">
+        <header className="pb-6 mb-6 border-b border-[var(--border)] flex flex-col gap-4">
+          <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight text-balance">
             {article.title}
           </h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--muted)]">
@@ -398,111 +427,71 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
               </>
             )}
           </div>
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <button
+              onClick={handleCopyContent}
+              className="px-3 py-1.5 text-sm font-medium text-[var(--accent)] border border-[var(--accent)] rounded hover:bg-[var(--accent)] hover:text-white transition-colors inline-flex items-center gap-1.5"
+            >
+              <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
+              Copy
+            </button>
+            <button
+              onClick={handleToggleStarred}
+              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors inline-flex items-center gap-1.5 ${
+                article.isStarred === 1
+                  ? "text-amber-600 dark:text-amber-400 border border-amber-500 hover:bg-amber-500 hover:text-white"
+                  : "text-[var(--muted)] border border-[var(--border)] hover:border-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {article.isStarred === 1 ? (
+                <StarSolidIcon className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <StarOutlineIcon className="h-4 w-4" aria-hidden="true" />
+              )}
+              {article.isStarred === 1 ? "Starred" : "Star"}
+            </button>
+            <button
+              onClick={handleToggleRead}
+              className="px-3 py-1.5 text-sm font-medium text-[var(--muted)] border border-[var(--border)] rounded hover:border-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+            >
+              {article.isRead === 1 ? "Mark Unread" : "Mark Read"}
+            </button>
+          </div>
         </header>
 
-        {/* Actions */}
-        <div className="mb-8 flex flex-wrap items-center gap-4">
-          <button
-            onClick={handleCopyContent}
-            className="px-3 py-1.5 text-sm font-medium text-[var(--accent)] border border-[var(--accent)] rounded hover:bg-[var(--accent)] hover:text-white transition-colors inline-flex items-center gap-1.5"
-          >
-            <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
-            Copy
-          </button>
-          <button
-            onClick={handleToggleStarred}
-            className={`px-3 py-1.5 text-sm font-medium rounded transition-colors inline-flex items-center gap-1.5 ${
-              article.isStarred === 1
-                ? "text-amber-600 dark:text-amber-400 border border-amber-500 hover:bg-amber-500 hover:text-white"
-                : "text-[var(--muted)] border border-[var(--border)] hover:border-[var(--muted)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            {article.isStarred === 1 ? (
-              <StarSolidIcon className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <StarOutlineIcon className="h-4 w-4" aria-hidden="true" />
-            )}
-            {article.isStarred === 1 ? "Starred" : "Star"}
-          </button>
-          <button
-            onClick={handleToggleRead}
-            className="px-3 py-1.5 text-sm font-medium text-[var(--muted)] border border-[var(--border)] rounded hover:border-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
-          >
-            {article.isRead === 1 ? "Mark Unread" : "Mark Read"}
-          </button>
-        </div>
-
-        {/* Copy Status Toast */}
-        {copyStatus && (
-          <Toast tone={copyStatus.startsWith("✓") ? "success" : "error"}>
-            {copyStatus}
-          </Toast>
-        )}
-
-        {/* Extraction Status Toast */}
-        {extractionState.isExtracting && (
-          <Toast tone="info">
-            <span className="inline-flex items-center gap-2">
-              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Fetching full article
-            </span>
-          </Toast>
-        )}
-
-        {extractionState.error && !extractionState.isExtracting && (
-          <Toast
-            tone="warning"
-            actionLabel="Try again"
-            onAction={() => {
-              extractionAttemptedRef.current = null;
-              handleExtractContent();
-            }}
-          >
-            <span className="font-medium">{extractionState.error}</span>
-          </Toast>
-        )}
-
         {/* Article Content */}
-        <div className="article-content">
-          {article.content ? (
-            <div
-              dangerouslySetInnerHTML={{ __html: sanitizeHTML(article.content) }}
-            />
-          ) : article.summary ? (
-            <div className="text-gray-600 dark:text-gray-400">
-              <p>{article.summary}</p>
-              {article.url && !extractionState.isExtracting && (
-                <p className="mt-4">
-                  <a
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    Read full article →
-                  </a>
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className={emptyStateClass}>
-              <p className="mb-4">No content available for this article.</p>
-              {article.url && (
+        {article.content ? (
+          <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(article.content) }} />
+        ) : article.summary ? (
+          <div>
+            <p className="text-[var(--muted)]">{article.summary}</p>
+            {article.url && !extractionState.isExtracting && (
+              <p className="mt-4">
                 <a
                   href={article.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
-                  View original article →
+                  Read full article →
                 </a>
-              )}
-            </div>
-          )}
-        </div>
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className={`not-prose ${emptyStateClass}`}>
+            <p className="mb-4">No content available for this article.</p>
+            {article.url && (
+              <a
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                View original article →
+              </a>
+            )}
+          </div>
+        )}
       </article>
     </div>
   );
