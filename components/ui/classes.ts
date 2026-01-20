@@ -1,7 +1,7 @@
-export const cardClass = "border border-[var(--border)] rounded-lg p-4";
+export const cardClass = "border border-[var(--border)] p-4";
 
 export const emptyStateClass =
-  "text-[var(--muted)] text-center py-12 border border-[var(--border)] rounded-lg";
+  "text-[var(--muted)] text-center py-12";
 
 export const dialogOverlayClass = "fixed inset-0 z-50 flex items-center justify-center";
 export const dialogBackdropClass = "fixed inset-0 bg-black/50 transition-opacity";

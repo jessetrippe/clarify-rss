@@ -82,6 +82,17 @@ export async function deleteFeed(id: string): Promise<void> {
   });
 }
 
+/**
+ * Restore all articles for a feed (used when re-adding a deleted feed)
+ */
+export async function restoreFeedArticles(feedId: string): Promise<void> {
+  const now = new Date();
+  await db.articles.where("feedId").equals(feedId).modify({
+    isDeleted: 0,
+    updatedAt: now,
+  });
+}
+
 // feedExists removed - use getFeedByUrl instead
 
 // ============================================================================
@@ -187,6 +198,7 @@ export async function addArticle(params: {
         content: params.content,
         summary: params.summary,
         publishedAt: params.publishedAt,
+        isDeleted: 0,
         updatedAt: now,
       });
       return (await db.articles.get(id))!;

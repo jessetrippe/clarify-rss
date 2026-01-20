@@ -172,7 +172,7 @@ export default function Settings() {
         <OPMLImport onSuccess={loadFeeds} />
 
         {/* Feed List */}
-        <div className="border-t border-[var(--border)] pt-6">
+        <div>
           <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--muted)] mb-4">
             Your Feeds {feeds.length > 0 && `(${feeds.length})`}
           </h2>
@@ -183,13 +183,13 @@ export default function Settings() {
               <p className="text-sm">Add your first RSS feed above to get started</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="border-t border-[var(--border)]">
               {feeds.map((feed) => (
                 <div
                   key={feed.id}
-                  className="border border-[var(--border)] rounded-lg p-4 hover:bg-[var(--border)]/30 transition-colors"
+                  className="py-4 border-b border-[var(--border)] hover:bg-[var(--border)]/30 transition-colors"
                 >
-                  <div className="flex justify-between items-start gap-4">
+                  <div className="flex justify-between items-start gap-4 px-2">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-[var(--foreground)] truncate">{feed.title}</h3>
                       <p className="text-sm text-[var(--muted)] mt-0.5 truncate">

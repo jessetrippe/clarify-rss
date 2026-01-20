@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { addFeed, getFeedByUrl, addArticle, updateFeed } from "@/lib/db-operations";
+import { addFeed, getFeedByUrl, addArticle, updateFeed, restoreFeedArticles } from "@/lib/db-operations";
 import { parseFeedFromApi, discoverFeedsFromApi, type FeedArticleData } from "@/lib/feed-api";
 import { cardClass, inputClass } from "@/components/ui/classes";
 import { feedLogger } from "@/lib/logger";
@@ -57,6 +57,10 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
               title: feedData.title,
               iconUrl: feedData.iconUrl,
             });
+
+        if (existingFeed?.isDeleted === 1) {
+          await restoreFeedArticles(feed.id);
+        }
 
         // Add initial articles
         const articlePromises = feedData.articles.map((article: FeedArticleData) =>

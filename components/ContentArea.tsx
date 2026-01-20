@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCallback } from "react";
+import { DocumentTextIcon } from "@heroicons/react/24/outline";
 import ListPane from "@/components/ListPane";
 import ArticleDetail from "@/components/ArticleDetail";
 
@@ -30,12 +31,15 @@ export default function ContentArea({ variant, feedId }: ContentAreaProps) {
 
       {/* Article detail or placeholder */}
       {articleId ? (
-        <div className="flex-1 xl:border-l xl:border-gray-200 xl:dark:border-gray-800 xl:pl-6 xl:overflow-y-auto">
+        <div className="flex-1 xl:border-l xl:border-gray-200 xl:dark:border-gray-800 xl:pl-6 xl:pt-6 xl:overflow-y-auto">
           <ArticleDetail articleId={articleId} onBack={handleBack} />
         </div>
       ) : (
-        <div className="hidden xl:flex flex-1 border-l border-gray-200 dark:border-gray-800 pl-6 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-          Select an article to read
+        <div className="hidden xl:flex flex-1 border-l border-gray-200 dark:border-gray-800 pl-6 items-center justify-center">
+          <div className="text-center text-sm text-gray-500 dark:text-gray-400">
+            <DocumentTextIcon className="h-10 w-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" aria-hidden="true" />
+            Select an article to read
+          </div>
         </div>
       )}
     </div>

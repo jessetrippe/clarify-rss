@@ -72,6 +72,8 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
   // Always start with false to match server-side render and prevent hydration mismatch
   const [showRead, setShowRead] = useState(false);
+  const showReadToggle = variant !== "starred";
+  const effectiveShowRead = showReadToggle ? showRead : true;
 
   useEffect(() => {
     if (!storageKey) return;
@@ -184,9 +186,9 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
   // Memoize visible articles calculation to prevent unnecessary filtering
   const visibleArticles = useMemo(() => {
-    uiLogger.debug('Filtering articles. showRead:', showRead, 'readInSession size:', readInSession.size, 'total articles:', resolvedArticles.length);
+    uiLogger.debug('Filtering articles. showRead:', effectiveShowRead, 'readInSession size:', readInSession.size, 'total articles:', resolvedArticles.length);
 
-    if (showRead) return resolvedArticles;
+    if (effectiveShowRead) return resolvedArticles;
 
     // Show unread articles + articles marked as read in this session
     const filtered = resolvedArticles.filter(article =>
@@ -195,7 +197,7 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
     uiLogger.debug('Visible articles after filter:', filtered.length);
     return filtered;
-  }, [resolvedArticles, showRead, readInSession]);
+  }, [resolvedArticles, effectiveShowRead, readInSession]);
 
   // Detect newly read articles and keep them visible for this session
   const previousReadState = useRef<Map<string, number>>(new Map());
@@ -324,8 +326,6 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
       <ListPaneHeader
         title={headerTitle}
         count={visibleArticles.length}
-        showRead={showRead}
-        onShowReadChange={handleShowReadChange}
       />
 
       {visibleArticles.length === 0 ? (
@@ -340,6 +340,35 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
           feedNames={feedNames}
           fromPath={listPath}
         />
+      )}
+
+      {showReadToggle && (
+        <div className="sticky bottom-0 bg-[var(--background)] border-t border-[var(--border)] px-4 py-2 flex justify-center">
+          <div className="inline-flex rounded overflow-hidden border border-[var(--border)]">
+            <button
+              type="button"
+              onClick={() => handleShowReadChange(false)}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                !effectiveShowRead
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              Unread
+            </button>
+            <button
+              type="button"
+              onClick={() => handleShowReadChange(true)}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-[var(--border)] ${
+                effectiveShowRead
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              All
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -24,6 +24,7 @@ import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { articleCache } from "@/lib/article-cache";
 import { uiLogger } from "@/lib/logger";
 import { emptyStateClass } from "@/components/ui/classes";
+import Toast from "@/components/ui/Toast";
 
 interface ArticleDetailProps {
   articleId: string;
@@ -191,18 +192,38 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
     if (!article) return;
 
     // Check if content appears truncated (common patterns from RSS feeds)
-    const isTruncatedContent = (content: string | undefined): boolean => {
+    const getTextLength = (html?: string): number => {
+      if (!html) return 0;
+      return html
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .length;
+    };
+
+    const isTruncatedContent = (content: string | undefined, summary?: string): boolean => {
       if (!content) return false;
       const trimmed = content.trim();
+      const contentLength = getTextLength(content);
+      const summaryLength = getTextLength(summary);
+
       // Common truncation patterns
-      return (
+      const hasTruncationMarkers =
         trimmed.endsWith('…') ||
         trimmed.endsWith('...') ||
         trimmed.includes('Read the full story at') ||
         trimmed.includes('Continue reading') ||
         trimmed.includes('[...]') ||
-        trimmed.includes('Read more')
-      );
+        trimmed.includes('Read more');
+
+      // Likely just a summary or preview blurb
+      const isSummaryLength =
+        contentLength > 0 &&
+        contentLength < 600 &&
+        summaryLength > 0 &&
+        contentLength <= summaryLength + 40;
+
+      return hasTruncationMarkers || isSummaryLength;
     };
 
     // Check if we should auto-extract:
@@ -210,11 +231,11 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
     // - Has a URL to extract from
     // - Hasn't already been extracted (completed or failed)
     // - We haven't already attempted extraction for this article
-    const needsExtraction = !article.content || isTruncatedContent(article.content);
+    const needsExtraction =
+      !article.content || isTruncatedContent(article.content, article.summary);
     const shouldExtract =
       needsExtraction &&
       article.url &&
-      article.extractionStatus !== 'completed' &&
       article.extractionStatus !== 'failed' &&
       extractionAttemptedRef.current !== article.id;
 
@@ -277,7 +298,7 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
     });
 
     if (result.success) {
-      setCopyStatus("✓ Copied to clipboard!");
+      setCopyStatus("✓ Copied to clipboard");
       copyStatusTimeoutRef.current = setTimeout(() => setCopyStatus(""), 3000);
     } else {
       setCopyStatus(`✗ ${result.error}`);
@@ -411,52 +432,37 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
           </button>
         </div>
 
-        {/* Copy Status */}
+        {/* Copy Status Toast */}
         {copyStatus && (
-          <div
-            className={`mb-6 px-3 py-2 rounded text-sm ${
-              copyStatus.startsWith("✓")
-                ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
-                : "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
-            }`}
-          >
+          <Toast tone={copyStatus.startsWith("✓") ? "success" : "error"}>
             {copyStatus}
-          </div>
+          </Toast>
         )}
 
-        {/* Extraction Status */}
+        {/* Extraction Status Toast */}
         {extractionState.isExtracting && (
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex items-center gap-3">
-              <svg className="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <Toast tone="info">
+            <span className="inline-flex items-center gap-2">
+              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="text-blue-800 dark:text-blue-200">
-                Fetching full article from {article.url ? new URL(article.url).hostname : 'source'}...
-              </span>
-            </div>
-          </div>
+              Fetching full article
+            </span>
+          </Toast>
         )}
 
         {extractionState.error && !extractionState.isExtracting && (
-          <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-amber-800 dark:text-amber-200 font-medium">Could not fetch full article</p>
-                <p className="text-amber-700 dark:text-amber-300 text-sm mt-1">{extractionState.error}</p>
-              </div>
-              <button
-                onClick={() => {
-                  extractionAttemptedRef.current = null;
-                  handleExtractContent();
-                }}
-                className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700 whitespace-nowrap"
-              >
-                Try again
-              </button>
-            </div>
-          </div>
+          <Toast
+            tone="warning"
+            actionLabel="Try again"
+            onAction={() => {
+              extractionAttemptedRef.current = null;
+              handleExtractContent();
+            }}
+          >
+            <span className="font-medium">{extractionState.error}</span>
+          </Toast>
         )}
 
         {/* Article Content */}

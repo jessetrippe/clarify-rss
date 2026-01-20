@@ -7,15 +7,11 @@ import { useRefreshState } from "@/hooks/useFeedRefreshState";
 interface ListPaneHeaderProps {
   title: string;
   count: number;
-  showRead: boolean;
-  onShowReadChange: (checked: boolean) => void;
 }
 
 export default function ListPaneHeader({
   title,
   count,
-  showRead,
-  onShowReadChange,
 }: ListPaneHeaderProps) {
   const { openMenu } = useMobileMenu();
   const isRefreshing = useRefreshState();
@@ -62,30 +58,6 @@ export default function ListPaneHeader({
               </svg>
             )}
           </div>
-        </div>
-        <div className="inline-flex rounded overflow-hidden border border-[var(--border)] shrink-0">
-          <button
-            type="button"
-            onClick={() => onShowReadChange(false)}
-            className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-              !showRead
-                ? "bg-[var(--accent)] text-white"
-                : "bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            Unread
-          </button>
-          <button
-            type="button"
-            onClick={() => onShowReadChange(true)}
-            className={`px-2.5 py-1 text-xs font-medium transition-colors border-l border-[var(--border)] ${
-              showRead
-                ? "bg-[var(--accent)] text-white"
-                : "bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            All
-          </button>
         </div>
       </div>
     </div>

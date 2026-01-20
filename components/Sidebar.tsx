@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Feed } from "@/lib/types";
 import { getFeedIconCandidates } from "@/lib/feed-icon";
-import { getAllFeeds, getUnreadCountsByFeed } from "@/lib/db-operations";
+import { getAllFeeds, getUnreadCountsByFeed, getCounts } from "@/lib/db-operations";
 import { StarIcon, Cog6ToothIcon, InboxIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useMobileMenu } from "@/components/MobileMenuProvider";
 
@@ -14,6 +14,9 @@ export default function Sidebar({ className = "" }: { className?: string }) {
   const { isOpen, closeMenu } = useMobileMenu();
   const feeds = useLiveQuery(async () => getAllFeeds(), []) as Feed[] | undefined;
   const unreadCounts = useLiveQuery(async () => getUnreadCountsByFeed(), []) as Record<string, number> | undefined;
+  const counts = useLiveQuery(async () => getCounts(), []) as
+    | { unreadCount: number; starredCount: number }
+    | undefined;
 
   const isActive = (href: string) => pathname === href;
   const isFeedActive = (feedId: string) => pathname === `/feeds/${feedId}`;
@@ -31,7 +34,7 @@ export default function Sidebar({ className = "" }: { className?: string }) {
     `}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6 px-2">
-        <Link href="/" className="text-lg font-semibold tracking-tight">
+        <Link href="/" className="text-lg font-bold tracking-tight font-serif">
           Clarify
         </Link>
         {isOpen && (
@@ -59,6 +62,15 @@ export default function Sidebar({ className = "" }: { className?: string }) {
         >
           <InboxIcon className="h-4 w-4" aria-hidden="true" />
           All Items
+          {counts && counts.unreadCount > 0 && (
+            <span className={`ml-auto text-xs tabular-nums shrink-0 ${
+              isActive("/")
+                ? "text-white/80"
+                : "text-[var(--muted)]"
+            }`}>
+              {counts.unreadCount}
+            </span>
+          )}
         </Link>
         <Link
           href="/starred"
@@ -71,6 +83,15 @@ export default function Sidebar({ className = "" }: { className?: string }) {
         >
           <StarIcon className="h-4 w-4" aria-hidden="true" />
           Starred
+          {counts && counts.starredCount > 0 && (
+            <span className={`ml-auto text-xs tabular-nums shrink-0 ${
+              isActive("/starred")
+                ? "text-white/80"
+                : "text-[var(--muted)]"
+            }`}>
+              {counts.starredCount}
+            </span>
+          )}
         </Link>
       </nav>
 
@@ -101,7 +122,7 @@ export default function Sidebar({ className = "" }: { className?: string }) {
                       src={iconCandidates[0]}
                       alt=""
                       data-fallback-index="0"
-                      className={`h-4 w-4 rounded object-contain shrink-0 ${active ? "" : "opacity-80"}`}
+                      className={`h-4 w-4 rounded object-contain shrink-0 dark:bg-white dark:p-0.5 ${active ? "" : "opacity-80"}`}
                       onError={(event) => {
                         const currentIndex = Number(
                           event.currentTarget.dataset.fallbackIndex || "0"

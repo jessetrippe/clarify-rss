@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { StarIcon } from "@heroicons/react/24/solid";
 import type { Article } from "@/lib/types";
@@ -20,6 +20,7 @@ interface ArticleItemProps {
   showFeedName: boolean;
   feedName?: string;
   sourcePath: string;
+  isSelected: boolean;
 }
 
 // Individual article item - memoized so only changed articles re-render
@@ -28,6 +29,7 @@ const ArticleItem = React.memo(function ArticleItem({
   showFeedName,
   feedName,
   sourcePath,
+  isSelected,
 }: ArticleItemProps) {
   const isUnread = article.isRead === 0;
 
@@ -35,7 +37,11 @@ const ArticleItem = React.memo(function ArticleItem({
     <Link
       href={`${sourcePath}?article=${encodeURIComponent(article.id)}`}
       onClick={() => primeArticleCache(article)}
-      className="block px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--border)]/50 transition-colors"
+      className={`block px-4 py-3 border-b border-[var(--border)] transition-colors ${
+        isSelected
+          ? "bg-[var(--border)]/70 ring-1 ring-inset ring-[var(--accent)]/40"
+          : "hover:bg-[var(--border)]/50"
+      }`}
     >
       {/* Metadata line */}
       <div className="flex items-center gap-2 text-xs text-[var(--muted)] mb-1">
@@ -69,8 +75,8 @@ const ArticleItem = React.memo(function ArticleItem({
         {article.title}
       </h3>
 
-      {/* Summary - only show for unread */}
-      {article.summary && isUnread && (
+      {/* Summary */}
+      {article.summary && (
         <p className="text-sm text-[var(--muted)] line-clamp-2 mt-1">
           {article.summary}
         </p>
@@ -86,7 +92,8 @@ const ArticleItem = React.memo(function ArticleItem({
     prevProps.article.title === nextProps.article.title &&
     prevProps.showFeedName === nextProps.showFeedName &&
     prevProps.feedName === nextProps.feedName &&
-    prevProps.sourcePath === nextProps.sourcePath
+    prevProps.sourcePath === nextProps.sourcePath &&
+    prevProps.isSelected === nextProps.isSelected
   );
 });
 
@@ -97,7 +104,9 @@ const ArticleList = React.memo(function ArticleList({
   fromPath,
 }: ArticleListProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const sourcePath = fromPath || pathname;
+  const selectedId = searchParams.get("article");
 
   if (articles.length === 0) {
     return (
@@ -117,6 +126,7 @@ const ArticleList = React.memo(function ArticleList({
           showFeedName={showFeedName}
           feedName={feedNames[article.feedId]}
           sourcePath={sourcePath}
+          isSelected={selectedId === article.id}
         />
       ))}
     </>

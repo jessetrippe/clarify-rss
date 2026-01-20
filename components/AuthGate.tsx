@@ -76,7 +76,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight mb-2">Clarify</h1>
+          <h1 className="text-2xl font-bold tracking-tight mb-2 font-serif">Clarify</h1>
           <p className="text-sm text-[var(--muted)]">
             Sign in to access your RSS feeds
           </p>
