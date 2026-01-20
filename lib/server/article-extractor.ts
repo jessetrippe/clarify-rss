@@ -191,14 +191,33 @@ function extractFromJsonLd(document: Document): ExtractedContent {
 }
 
 function extractFromArticleElement(document: Document): ExtractedContent {
-  const container = document.querySelector("article") || document.querySelector("main");
+  // Try semantic elements first, then common WordPress/CMS content containers
+  const selectors = [
+    "article",
+    "main",
+    ".post-content",
+    ".entry-content",
+    ".article-content",
+    ".post-body",
+    ".content-area",
+    '[class*="post-container"]',
+    '[class*="article-body"]',
+  ];
+
+  let container: Element | null = null;
+  for (const selector of selectors) {
+    container = document.querySelector(selector);
+    if (container) break;
+  }
+
   if (!container) return {};
 
   const paragraphs = Array.from(container.querySelectorAll("p"))
     .map((p) => p.textContent?.replace(/\s+/g, " ").trim() || "")
     .filter((text) => text.length >= 40);
 
-  if (paragraphs.length < 3) return {};
+  // Lower threshold to 2 paragraphs for shorter articles
+  if (paragraphs.length < 2) return {};
 
   return { content: textToParagraphs(paragraphs.join("\n\n")) };
 }
@@ -206,6 +225,67 @@ function extractFromArticleElement(document: Document): ExtractedContent {
 function getTextLength(html?: string): number {
   if (!html) return 0;
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().length;
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&#8211;/g, "–")
+    .replace(/&#8212;/g, "—")
+    .replace(/&#8230;/g, "…")
+    .replace(/&#\d+;/g, (match) => {
+      const code = parseInt(match.slice(2, -1), 10);
+      return String.fromCharCode(code);
+    });
+}
+
+function extractParagraphsWithRegex(html: string): string[] {
+  // Simple regex-based extraction as a fallback when DOM parsing fails
+  // Find the earliest "end of content" marker and cut there
+  const cutoffPatterns = [
+    /<(?:div|section)[^>]*(?:id|class)="[^"]*comments?[-_]?(?:section|area|list)/i,
+    /<h\d[^>]*>\s*(?:Leave a reply|Comments|Related Posts)/i,
+    /id="respond"/i,
+  ];
+
+  let cutoffPoint = html.length;
+  for (const pattern of cutoffPatterns) {
+    const match = html.search(pattern);
+    // Only cut if match is in the latter half of the document (avoid header matches)
+    if (match > html.length / 3 && match < cutoffPoint) {
+      cutoffPoint = match;
+    }
+  }
+
+  const contentArea = html.slice(0, cutoffPoint);
+
+  const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+  const paragraphs: string[] = [];
+  let match;
+
+  while ((match = paragraphRegex.exec(contentArea)) !== null) {
+    // Strip inner HTML tags and normalize whitespace
+    const text = decodeHtmlEntities(
+      match[1].replace(/<[^>]*>/g, " ")
+    )
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (text.length >= 30) {
+      paragraphs.push(text);
+    }
+  }
+
+  return paragraphs;
 }
 
 async function fetchWithBrowserHeaders(url: string): Promise<Response> {
@@ -248,39 +328,78 @@ export async function extractArticleContent(
       };
     }
 
-    const { document } = parseHTML(html);
-
-    // Readability can fail on some pages (e.g., canvas-related errors with images)
-    // so wrap it in try/catch and fall back to other methods
-    let article: ReturnType<Readability<Document>["parse"]> = null;
-    try {
-      const reader = new Readability(document, {
-        keepClasses: false,
-        disableJSONLD: true,
-      });
-      article = reader.parse();
-    } catch {
-      // Readability failed, continue with fallback extraction methods
-    }
-
     const candidates: ExtractedContent[] = [];
-    if (article?.content) {
-      candidates.push({ content: article.content, title: article.title || undefined });
+
+    // Try DOM-based parsing, but fall back to regex if it fails (e.g., canvas errors)
+    let document: Document | null = null;
+    try {
+      document = parseHTML(html).document;
+    } catch {
+      // parseHTML failed, will use regex fallback below
     }
-    candidates.push(extractFromNextData(document));
-    const nextText = extractTextFromNextData(document);
-    if (nextText.text) {
-      candidates.push({ content: textToParagraphs(nextText.text), title: nextText.title });
+
+    // DOM-based extraction methods (only if parseHTML succeeded)
+    if (document) {
+      // Readability can fail on some pages (e.g., canvas-related errors with images)
+      try {
+        const reader = new Readability(document, {
+          keepClasses: false,
+          disableJSONLD: true,
+        });
+        const article = reader.parse();
+        if (article?.content) {
+          const content = article.content;
+          const title = article.title || undefined;
+          candidates.push({ content, title });
+        }
+      } catch {
+        // Readability failed
+      }
+
+      try {
+        candidates.push(extractFromNextData(document));
+      } catch {
+        // extractFromNextData failed
+      }
+
+      try {
+        const nextText = extractTextFromNextData(document);
+        if (nextText.text) {
+          candidates.push({ content: textToParagraphs(nextText.text), title: nextText.title });
+        }
+      } catch {
+        // extractTextFromNextData failed
+      }
+
+      try {
+        candidates.push(extractFromArticleElement(document));
+      } catch {
+        // extractFromArticleElement failed
+      }
+
+      try {
+        candidates.push(extractFromJsonLd(document));
+      } catch {
+        // extractFromJsonLd failed
+      }
     }
-    candidates.push(extractFromArticleElement(document));
-    candidates.push(extractFromJsonLd(document));
+
+    // Regex-based fallback (works even if DOM parsing failed)
+    try {
+      const paragraphs = extractParagraphsWithRegex(html);
+      if (paragraphs.length >= 1) {
+        candidates.push({ content: textToParagraphs(paragraphs.join("\n\n")) });
+      }
+    } catch {
+      // Regex extraction failed
+    }
 
     const best = candidates
       .filter((candidate) => candidate.content)
       .sort((a, b) => getTextLength(b.content) - getTextLength(a.content))[0];
 
     const content = best?.content;
-    const title = best?.title || article?.title || undefined;
+    const title = best?.title;
 
     if (!content) {
       return {
@@ -301,7 +420,6 @@ export async function extractArticleContent(
       success: true,
       content,
       title,
-      excerpt: article?.excerpt || undefined,
     };
   } catch (error) {
     const errorMessage =

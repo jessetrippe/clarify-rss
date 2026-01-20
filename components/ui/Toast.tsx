@@ -30,7 +30,7 @@ export default function Toast({
     <div
       role="status"
       aria-live="polite"
-      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-xs px-4 py-3 rounded-md text-sm shadow-lg border ${TONE_STYLES[tone]} ${className}`}
+      className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xs px-3 py-1.5 rounded-md text-sm shadow-lg border ${TONE_STYLES[tone]} ${className}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">{children}</div>
