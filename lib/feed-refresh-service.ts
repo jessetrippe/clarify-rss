@@ -79,22 +79,27 @@ export class FeedRefreshService {
               }
             );
 
-            // Add articles (addArticle handles duplicates via stable ID generation)
-            const articlePromises = feedData.articles.map((article) =>
-              addArticle({
-                feedId: feed.id,
-                guid: article.guid,
-                url: article.url,
-                title: article.title,
-                content: article.content,
-                summary: article.summary,
-                publishedAt: article.publishedAt
-                  ? new Date(article.publishedAt)
-                  : undefined,
-              })
-            );
-
-            await Promise.all(articlePromises);
+            // Add articles in batches to prevent too many concurrent IndexedDB operations
+            // (addArticle handles duplicates via stable ID generation)
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < feedData.articles.length; i += BATCH_SIZE) {
+              const batch = feedData.articles.slice(i, i + BATCH_SIZE);
+              await Promise.all(
+                batch.map((article) =>
+                  addArticle({
+                    feedId: feed.id,
+                    guid: article.guid,
+                    url: article.url,
+                    title: article.title,
+                    content: article.content,
+                    summary: article.summary,
+                    publishedAt: article.publishedAt
+                      ? new Date(article.publishedAt)
+                      : undefined,
+                  })
+                )
+              );
+            }
 
             // Update feed's lastFetchedAt timestamp and clear any error
             await updateFeed(feed.id, {

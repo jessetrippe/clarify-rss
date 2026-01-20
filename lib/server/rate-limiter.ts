@@ -1,6 +1,28 @@
 /**
  * Simple in-memory rate limiter for serverless routes.
- * Note: This resets per function instance.
+ *
+ * PRODUCTION LIMITATIONS:
+ * This implementation uses in-memory storage which has important limitations
+ * in serverless environments:
+ *
+ * 1. State resets per function instance - Each serverless cold start creates a
+ *    new instance with an empty rate limit store. Multiple concurrent requests
+ *    may hit different instances, each with separate counters.
+ *
+ * 2. No cross-instance coordination - Requests routed to different instances
+ *    don't share rate limit state, potentially allowing limits to be exceeded.
+ *
+ * 3. Suitable for: Single-user apps, low-traffic apps, development/testing,
+ *    or as a "best effort" rate limiter that catches most abuse.
+ *
+ * 4. Not suitable for: High-traffic apps, strict rate limiting requirements,
+ *    or multi-user apps where abuse prevention is critical.
+ *
+ * ALTERNATIVES FOR PRODUCTION SCALE:
+ * - Use Supabase: Store rate limit counters in the database
+ * - Use Redis: External state store (e.g., Upstash Redis on Vercel/Netlify)
+ * - Use edge rate limiting: Cloudflare, Netlify Edge, or Vercel Edge Config
+ * - Use API gateway rate limiting: AWS API Gateway, Kong, etc.
  */
 
 interface RateLimitEntry {

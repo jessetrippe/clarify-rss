@@ -5,15 +5,15 @@ import type { Feed, Article } from "./types";
 import { getSyncState, updateSyncState } from "./db-operations";
 import { getAccessToken } from "@/lib/supabase/auth";
 import { syncLogger } from "@/lib/logger";
+import { fetchWithTimeout } from "@/lib/fetch-utils";
+import { articleCache } from "@/lib/article-cache";
+import { isNetworkError } from "@/lib/network-utils";
 
 // API base URL (localhost for development, will be replaced with actual domain in production)
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Maximum number of sync iterations to prevent infinite loops
 const MAX_SYNC_ITERATIONS = 100;
-
-// Request timeout in milliseconds
-const REQUEST_TIMEOUT_MS = 30000;
 
 /**
  * Normalize timestamp to milliseconds
@@ -27,24 +27,6 @@ function normalizeTimestamp(timestamp: number | undefined): number {
     return timestamp * 1000;
   }
   return timestamp;
-}
-
-/**
- * Fetch with timeout
- */
-async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    return response;
-  } finally {
-    clearTimeout(timeoutId);
-  }
 }
 
 /**
@@ -145,6 +127,8 @@ export class SyncService {
               extractionError: article.extraction_error,
               extractedAt: article.extracted_at ? new Date(normalizeTimestamp(article.extracted_at)) : undefined,
             });
+            // Invalidate article cache to prevent stale data
+            articleCache.invalidate(article.id);
           }
         }
 
@@ -174,14 +158,7 @@ export class SyncService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       // Don't log network errors (expected when backend is unavailable)
-      const isNetworkError =
-        error instanceof Error &&
-        (error.name === "AbortError" ||
-          error.message.includes("Failed to fetch") ||
-          error.message.includes("NetworkError") ||
-          error.message.includes("Network request failed"));
-
-      if (!isNetworkError) {
+      if (!isNetworkError(error)) {
         syncLogger.error("Sync pull error:", errorMessage);
       }
       return {
@@ -273,14 +250,7 @@ export class SyncService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       // Don't log network errors (expected when backend is unavailable)
-      const isNetworkError =
-        error instanceof Error &&
-        (error.name === "AbortError" ||
-          error.message.includes("Failed to fetch") ||
-          error.message.includes("NetworkError") ||
-          error.message.includes("Network request failed"));
-
-      if (!isNetworkError) {
+      if (!isNetworkError(error)) {
         syncLogger.error("Sync push error:", errorMessage);
       }
       return {

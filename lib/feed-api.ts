@@ -4,11 +4,9 @@
 
 import { validateUrl } from "./validation";
 import { getAccessToken } from "@/lib/supabase/auth";
+import { fetchWithTimeout } from "@/lib/fetch-utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-
-// Request timeout in milliseconds
-const REQUEST_TIMEOUT_MS = 30000;
 
 export interface FeedArticleData {
   guid?: string;
@@ -24,27 +22,6 @@ export interface FeedData {
   url: string;
   iconUrl?: string;
   articles: FeedArticleData[];
-}
-
-/**
- * Fetch with timeout
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    return response;
-  } finally {
-    clearTimeout(timeoutId);
-  }
 }
 
 /**

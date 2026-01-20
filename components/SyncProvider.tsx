@@ -6,6 +6,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { feedRefreshService } from "@/lib/feed-refresh-service";
 import { setGlobalRefreshState } from "@/hooks/useFeedRefreshState";
 import { syncLogger } from "@/lib/logger";
+import { isNetworkError } from "@/lib/network-utils";
 
 interface SyncProviderProps {
   children: ReactNode;
@@ -71,12 +72,7 @@ export default function SyncProvider({ children }: SyncProviderProps) {
         syncLogger.debug("Sync complete");
       } catch (error) {
         // Don't log network errors (expected when backend is unavailable)
-        const isNetworkError =
-          error instanceof Error &&
-          (error.message.includes("Failed to fetch") ||
-            error.message.includes("NetworkError"));
-
-        if (!isNetworkError) {
+        if (!isNetworkError(error)) {
           syncLogger.error("Sync failed:", error);
         }
         setGlobalRefreshState(false);

@@ -1,5 +1,6 @@
 import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
+import { decodeHtmlEntities, getTextLength } from "@/lib/html-utils";
 
 export interface ExtractionResult {
   success: boolean;
@@ -222,32 +223,6 @@ function extractFromArticleElement(document: Document): ExtractedContent {
   return { content: textToParagraphs(paragraphs.join("\n\n")) };
 }
 
-function getTextLength(html?: string): number {
-  if (!html) return 0;
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().length;
-}
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#8217;/g, "'")
-    .replace(/&#8216;/g, "'")
-    .replace(/&#8220;/g, '"')
-    .replace(/&#8221;/g, '"')
-    .replace(/&#8211;/g, "–")
-    .replace(/&#8212;/g, "—")
-    .replace(/&#8230;/g, "…")
-    .replace(/&#\d+;/g, (match) => {
-      const code = parseInt(match.slice(2, -1), 10);
-      return String.fromCharCode(code);
-    });
-}
-
 function extractParagraphsWithRegex(html: string): string[] {
   // Simple regex-based extraction as a fallback when DOM parsing fails
   // Find the earliest "end of content" marker and cut there
@@ -320,6 +295,15 @@ export async function extractArticleContent(
 
     const response = await fetchWithBrowserHeaders(url);
     const html = await response.text();
+
+    // Limit content size to prevent abuse and reduce storage costs
+    const MAX_CONTENT_LENGTH = 2 * 1024 * 1024; // 2MB
+    if (html.length > MAX_CONTENT_LENGTH) {
+      return {
+        success: false,
+        error: "Page content too large",
+      };
+    }
 
     if (!html || html.length < 100) {
       return {

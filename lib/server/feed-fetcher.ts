@@ -1,5 +1,6 @@
 import Parser from "rss-parser";
 import { feedLogger } from "@/lib/logger";
+import { decodeHtmlEntities } from "@/lib/html-utils";
 
 const parser = new Parser({
   timeout: 10000,
@@ -20,44 +21,6 @@ export interface ParsedArticle {
   content?: string;
   summary?: string;
   publishedAt?: string;
-}
-
-function decodeHtmlEntities(text: string): string {
-  if (!text) return text;
-
-  const namedEntities: Record<string, string> = {
-    "&amp;": "&",
-    "&lt;": "<",
-    "&gt;": ">",
-    "&quot;": "\"",
-    "&apos;": "'",
-    "&nbsp;": " ",
-    "&mdash;": "\u2014",
-    "&ndash;": "\u2013",
-    "&lsquo;": "\u2018",
-    "&rsquo;": "\u2019",
-    "&ldquo;": "\u201C",
-    "&rdquo;": "\u201D",
-    "&hellip;": "\u2026",
-    "&copy;": "\u00A9",
-    "&reg;": "\u00AE",
-    "&trade;": "\u2122",
-  };
-
-  let result = text;
-
-  for (const [entity, char] of Object.entries(namedEntities)) {
-    result = result.split(entity).join(char);
-  }
-
-  result = result.replace(/&#(\d+);/g, (_, dec) =>
-    String.fromCharCode(Number.parseInt(dec, 10))
-  );
-  result = result.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
-    String.fromCharCode(Number.parseInt(hex, 16))
-  );
-
-  return result;
 }
 
 async function fetchFeedText(url: string): Promise<string> {

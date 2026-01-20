@@ -6,21 +6,21 @@ Code review completed 2026-01-19. Items organized by priority.
 
 ## High Priority (DRY Violations)
 
-### [ ] 1. Extract duplicate `decodeHtmlEntities()` to shared utility
+### [x] 1. Extract duplicate `decodeHtmlEntities()` to shared utility
 - **Files:**
   - `lib/server/article-extractor.ts:230-249`
   - `lib/server/feed-fetcher.ts:25-61`
 - **Action:** Create `lib/html-utils.ts` with a single `decodeHtmlEntities()` function and import in both files
 - **Impact:** Reduces duplication, ensures consistent HTML entity handling
 
-### [ ] 2. Extract duplicate `fetchWithTimeout()` to shared utility
+### [x] 2. Extract duplicate `fetchWithTimeout()` to shared utility
 - **Files:**
   - `lib/feed-api.ts:32-48`
   - `lib/sync-service.ts:35-48`
 - **Action:** Create `lib/fetch-utils.ts` with reusable `fetchWithTimeout()` function; unify timeout constants
 - **Impact:** Reduces duplication, easier to maintain timeout logic
 
-### [ ] 3. Move article sorting to database layer
+### [x] 3. Move article sorting to database layer
 - **File:** `lib/db-operations.ts:105-153`
 - **Action:** Use Dexie's `.reverse()` method instead of fetching all articles into memory and sorting in JavaScript
 - **Example:**
@@ -37,7 +37,7 @@ Code review completed 2026-01-19. Items organized by priority.
 
 ## Medium Priority (Performance & Cost)
 
-### [ ] 4. Batch article inserts during feed refresh
+### [x] 4. Batch article inserts during feed refresh
 - **File:** `lib/feed-refresh-service.ts:83-97`
 - **Action:** Instead of `Promise.all()` on all articles at once, batch in groups of 50
 - **Example:**
@@ -50,7 +50,7 @@ Code review completed 2026-01-19. Items organized by priority.
   ```
 - **Impact:** Smoother UX when adding feeds with many articles
 
-### [ ] 5. Add cache invalidation after sync
+### [x] 5. Add cache invalidation after sync
 - **Files:**
   - `components/ArticleDetail.tsx:36-47`
   - `lib/sync-service.ts`
@@ -64,7 +64,7 @@ Code review completed 2026-01-19. Items organized by priority.
   ```
 - **Impact:** Prevents stale cached data after background sync
 
-### [ ] 6. Add content-size limit to article extraction
+### [x] 6. Add content-size limit to article extraction
 - **File:** `lib/server/article-extractor.ts:309-457`
 - **Action:** Add a 2MB limit on HTML content size before processing
 - **Example:**
@@ -76,7 +76,7 @@ Code review completed 2026-01-19. Items organized by priority.
   ```
 - **Impact:** Prevents abuse, reduces storage costs
 
-### [ ] 7. Extract duplicate network error checking to shared utility
+### [x] 7. Extract duplicate network error checking to shared utility
 - **Files:**
   - `lib/sync-service.ts:176-182, 276-281`
   - `components/SyncProvider.tsx:74-77`
@@ -87,7 +87,7 @@ Code review completed 2026-01-19. Items organized by priority.
 
 ## Lower Priority (Scale Considerations)
 
-### [ ] 8. Document or improve rate limiter for production
+### [x] 8. Document or improve rate limiter for production
 - **File:** `lib/server/rate-limiter.ts`
 - **Issue:** In-memory storage resets per serverless function instance
 - **Options:**

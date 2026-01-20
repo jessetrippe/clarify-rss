@@ -101,55 +101,40 @@ export async function restoreFeedArticles(feedId: string): Promise<void> {
 
 /**
  * Get all articles (excluding deleted), sorted by published date (newest first)
+ * Uses database-level sorting via the publishedAt index for better performance
  */
 export async function getAllArticles(): Promise<Article[]> {
-  const articles = await db.articles
-    .where("isDeleted")
-    .equals(0)
+  return db.articles
+    .orderBy("publishedAt")
+    .reverse()
+    .filter((article) => article.isDeleted === 0)
     .toArray();
-
-  // Sort by publishedAt descending (newest first), with null/undefined at the end
-  return articles.sort((a, b) => {
-    const aTime = a.publishedAt?.getTime() ?? 0;
-    const bTime = b.publishedAt?.getTime() ?? 0;
-    return bTime - aTime;
-  });
 }
 
 /**
- * Get articles by feed ID
+ * Get articles by feed ID, sorted by published date (newest first)
+ * Uses database-level sorting via the publishedAt index for better performance
  */
 export async function getArticlesByFeed(feedId: string): Promise<Article[]> {
   if (!feedId) return [];
 
-  const articles = await db.articles
-    .where("[feedId+isDeleted]")
-    .equals([feedId, 0])
+  return db.articles
+    .orderBy("publishedAt")
+    .reverse()
+    .filter((article) => article.feedId === feedId && article.isDeleted === 0)
     .toArray();
-
-  // Sort by publishedAt descending (newest first)
-  return articles.sort((a, b) => {
-    const aTime = a.publishedAt?.getTime() ?? 0;
-    const bTime = b.publishedAt?.getTime() ?? 0;
-    return bTime - aTime;
-  });
 }
 
 /**
- * Get starred articles
+ * Get starred articles, sorted by published date (newest first)
+ * Uses database-level sorting via the publishedAt index for better performance
  */
 export async function getStarredArticles(): Promise<Article[]> {
-  const articles = await db.articles
-    .where("[isStarred+isDeleted]")
-    .equals([1, 0])
+  return db.articles
+    .orderBy("publishedAt")
+    .reverse()
+    .filter((article) => article.isStarred === 1 && article.isDeleted === 0)
     .toArray();
-
-  // Sort by publishedAt descending (newest first)
-  return articles.sort((a, b) => {
-    const aTime = a.publishedAt?.getTime() ?? 0;
-    const bTime = b.publishedAt?.getTime() ?? 0;
-    return bTime - aTime;
-  });
 }
 
 // getUnreadArticles removed - use getAllArticles and filter in component
