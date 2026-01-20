@@ -21,13 +21,9 @@ import {
   StarIcon as StarOutlineIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
-import { createMapCacheManager } from "@/lib/cache";
+import { articleCache } from "@/lib/article-cache";
 import { uiLogger } from "@/lib/logger";
 import { emptyStateClass } from "@/components/ui/classes";
-
-// Global cache for articles to enable instant navigation
-type CachedArticleData = { article: Article; feed: Feed | null };
-const articleCache = createMapCacheManager<string, CachedArticleData>("Article");
 
 interface ArticleDetailProps {
   articleId: string;

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { format } from "date-fns";
 import { StarIcon } from "@heroicons/react/24/solid";
 import type { Article } from "@/lib/types";
+import { primeArticleCache } from "@/lib/article-cache";
 
 interface ArticleListProps {
   articles: Article[];
@@ -33,6 +34,7 @@ const ArticleItem = React.memo(function ArticleItem({
   return (
     <Link
       href={`${sourcePath}?article=${encodeURIComponent(article.id)}`}
+      onClick={() => primeArticleCache(article)}
       className="block px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--border)]/50 transition-colors"
     >
       {/* Metadata line */}
