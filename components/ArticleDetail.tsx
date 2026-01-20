@@ -395,7 +395,7 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
         </Toast>
       )}
 
-      <article className="prose dark:prose-invert prose-lg max-w-2xl mx-auto font-serif prose-headings:font-sans">
+      <article className="max-w-2xl mx-auto">
         <header className="pb-6 mb-6 border-b border-[var(--border)] flex flex-col gap-4">
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight text-balance">
             {article.title}
@@ -461,9 +461,12 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
 
         {/* Article Content */}
         {article.content ? (
-          <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(article.content) }} />
+          <div
+            className="prose dark:prose-invert prose-lg max-w-none font-serif prose-headings:font-sans"
+            dangerouslySetInnerHTML={{ __html: sanitizeHTML(article.content) }}
+          />
         ) : article.summary ? (
-          <div>
+          <div className="prose dark:prose-invert prose-lg max-w-none">
             <p className="text-[var(--muted)]">{article.summary}</p>
             {article.url && !extractionState.isExtracting && (
               <p className="mt-4">
@@ -478,7 +481,7 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
             )}
           </div>
         ) : (
-          <div className={`not-prose ${emptyStateClass}`}>
+          <div className={emptyStateClass}>
             <p className="mb-4">No content available for this article.</p>
             {article.url && (
               <a

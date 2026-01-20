@@ -249,12 +249,19 @@ export async function extractArticleContent(
     }
 
     const { document } = parseHTML(html);
-    const reader = new Readability(document, {
-      keepClasses: false,
-      disableJSONLD: true,
-    });
 
-    const article = reader.parse();
+    // Readability can fail on some pages (e.g., canvas-related errors with images)
+    // so wrap it in try/catch and fall back to other methods
+    let article: ReturnType<Readability<Document>["parse"]> = null;
+    try {
+      const reader = new Readability(document, {
+        keepClasses: false,
+        disableJSONLD: true,
+      });
+      article = reader.parse();
+    } catch {
+      // Readability failed, continue with fallback extraction methods
+    }
 
     const candidates: ExtractedContent[] = [];
     if (article?.content) {
