@@ -35,7 +35,7 @@ export default function Sidebar({ className = "" }: { className?: string }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6 px-2">
         <Link href="/" className="text-lg font-bold tracking-tight font-serif">
-          Clarify
+          Clarify RSS
         </Link>
         {isOpen && (
           <button
