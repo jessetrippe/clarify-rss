@@ -2,7 +2,13 @@
 
 **Project:** Clarify RSS - Personal, plaintext RSS reader
 **Created:** 2026-01-12
-**Status:** In Development (Phases 0-6 implemented; Phase 7 partially complete)
+**Status:** In Development (Phases 0-6, 8 complete; Phase 7 partially complete - pending production deployment)
+
+---
+
+## Progress Update (2026-01-19)
+
+Code review completed. Identified 9 opportunities for improvement (DRY violations, performance optimizations, cost/scale considerations). See `TASKS.md` for actionable items.
 
 ---
 
@@ -94,7 +100,6 @@ Clarify RSS is designed to solve this problem by providing:
 ### Non-Goals (MVP)
 
 - Multi-user support or account management
-- Full article extraction from source websites (accept feed-provided content only)
 - Background/scheduled feed refresh (only on app open/focus)
 - Feed folders or hierarchical organization
 - Feed tags or categories
@@ -106,6 +111,8 @@ Clarify RSS is designed to solve this problem by providing:
 - Analytics or usage tracking
 - Image proxying or caching
 - Custom themes or appearance settings
+
+> **Note:** Full article extraction from source websites was originally a non-goal but was implemented to handle feeds that only provide summaries.
 
 ### Feature Scope (MVP)
 
@@ -227,7 +234,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 0: Project Setup & Foundation
+## Phase 0: Project Setup & Foundation ✅ COMPLETE
 
 **Goal:** Initialize the project with all tooling and basic structure
 **Estimated Sessions:** 1
@@ -291,7 +298,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 1: Local Database & Data Models
+## Phase 1: Local Database & Data Models ✅ COMPLETE
 
 **Goal:** Set up IndexedDB with Dexie.js and define all data models
 **Estimated Sessions:** 2-3
@@ -376,7 +383,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 2: Feed Management UI
+## Phase 2: Feed Management UI ✅ COMPLETE
 
 **Goal:** Build UI to add, list, and manage feeds
 **Estimated Sessions:** 2-3
@@ -427,7 +434,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 3: Article Display & Reading Experience
+## Phase 3: Article Display & Reading Experience ✅ COMPLETE
 
 **Goal:** Build the core reading experience with article lists and detail views
 **Estimated Sessions:** 2-3
@@ -452,12 +459,13 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    - Show only starred articles
    - Same reverse chronological sort
 
-4. **Article detail view** (`app/articles/[id]/page.tsx`)
+4. **Article detail view** (`components/ArticleDetail.tsx`)
    - Display article title
    - Display feed name (link to feed)
    - Display publication date (formatted with date-fns)
    - Display article content (sanitized HTML)
    - Auto-mark as read on open
+   - Auto-extract full content when feed provides only summary
 
 5. **HTML sanitization** (`lib/sanitize.ts`)
    - Use DOMPurify
@@ -501,7 +509,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 4: Backend Infrastructure (Supabase)
+## Phase 4: Backend Infrastructure (Supabase) ✅ COMPLETE
 
 **Goal:** Set up Supabase Postgres and Next.js API routes for sync and feed parsing
 **Estimated Sessions:** 3-4
@@ -552,7 +560,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 5: Feed Refresh & Sync Integration
+## Phase 5: Feed Refresh & Sync Integration ✅ COMPLETE
 
 **Goal:** Implement RSS feed parsing and integrate sync with frontend
 **Estimated Sessions:** 3-4
@@ -627,7 +635,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 6: PWA & Offline Support
+## Phase 6: PWA & Offline Support ✅ COMPLETE
 
 **Goal:** Full PWA functionality with offline support
 **Estimated Sessions:** 2-3
@@ -697,11 +705,12 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 7: Security, Polish & Deployment
+## Phase 7: Security, Polish & Deployment ⏳ IN PROGRESS
 
 **Goal:** Final security hardening, polish, and deploy to production
 **Estimated Sessions:** 2-3
 **Dependencies:** Phase 6
+**Status:** Security hardening complete; pending production deployment and final testing
 
 ### Tasks
 
@@ -785,31 +794,32 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 8: Dark Mode & Theming
+## Phase 8: Dark Mode & Theming ✅ COMPLETE
 
 **Goal:** Add dark mode after core functionality is stable
 **Estimated Sessions:** 1-2
 **Dependencies:** Phase 7
+**Status:** Complete - Dark mode implemented via CSS custom properties and system preference detection
 
 ### Tasks
 
-1. **Theme tokens**
-   - Define light/dark CSS variables
-   - Ensure contrast meets accessibility targets
+1. **Theme tokens** ✅
+   - Define light/dark CSS variables in `globals.css`
+   - Contrast meets accessibility targets
 
-2. **Theme selection**
-   - Default to system preference
-   - Allow manual override (persist locally)
+2. **Theme selection** ✅
+   - Defaults to system preference via `prefers-color-scheme`
+   - Manual override not implemented (using system preference only)
 
-3. **UI validation**
-   - Verify all screens in dark mode
-   - Check article content readability
-   - Validate icons/illustrations render correctly
+3. **UI validation** ✅
+   - All screens support dark mode via `dark:` Tailwind classes
+   - Article content readable in both modes
+   - Icons render correctly
 
 ### Deliverables
 
 - ✅ Dark mode available across the app
-- ✅ Theme preference persists locally
+- ✅ Theme follows system preference
 - ✅ Accessibility contrast targets met
 
 ### Checkpoint
@@ -882,7 +892,7 @@ Use this checklist to verify functionality at the end of the project.
 ### Security
 - [ ] Supabase Auth protects all routes
 - [x] DOMPurify sanitizes all HTML (re-sanitizes after DOM modifications)
-- [ ] CSP policy enforced
+- [x] CSP policy enforced (configured in next.config.ts)
 - [x] External links have noopener/noreferrer
 - [x] No XSS vulnerabilities (fixed sanitization security issue)
 - [ ] HTTPS only (requires production deployment)
@@ -927,7 +937,7 @@ Features to consider after MVP is complete:
 - [ ] Feed folders/organization
 - [ ] Feed tags
 - [ ] Article filters (by date, by source, etc.)
-- [ ] Dark mode theme
+- [ ] Manual theme toggle (currently system-preference only)
 - [ ] Custom feed refresh intervals
 - [ ] Article retention policies (auto-delete old articles)
 - [ ] Feed statistics (articles per day, etc.)
@@ -937,6 +947,7 @@ Features to consider after MVP is complete:
 - [ ] Background sync (Periodic Background Sync API)
 - [ ] Web Share Target API (add feeds from other apps)
 - [ ] Badging API (unread count on app icon)
+- [ ] Display last sync time in UI
 
 ---
 
