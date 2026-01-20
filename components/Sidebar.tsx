@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Feed } from "@/lib/types";
 import { getFeedIconCandidates } from "@/lib/feed-icon";
-import { getAllFeeds } from "@/lib/db-operations";
+import { getAllFeeds, getUnreadCountsByFeed } from "@/lib/db-operations";
 import { StarIcon, Cog6ToothIcon, InboxIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useMobileMenu } from "@/components/MobileMenuProvider";
 
@@ -13,6 +13,7 @@ export default function Sidebar({ className = "" }: { className?: string }) {
   const pathname = usePathname();
   const { isOpen, closeMenu } = useMobileMenu();
   const feeds = useLiveQuery(async () => getAllFeeds(), []) as Feed[] | undefined;
+  const unreadCounts = useLiveQuery(async () => getUnreadCountsByFeed(), []) as Record<string, number> | undefined;
 
   const isActive = (href: string) => pathname === href;
   const isFeedActive = (feedId: string) => pathname === `/feeds/${feedId}`;
@@ -100,7 +101,7 @@ export default function Sidebar({ className = "" }: { className?: string }) {
                       src={iconCandidates[0]}
                       alt=""
                       data-fallback-index="0"
-                      className={`h-4 w-4 rounded object-contain ${active ? "" : "opacity-80"}`}
+                      className={`h-4 w-4 rounded object-contain shrink-0 ${active ? "" : "opacity-80"}`}
                       onError={(event) => {
                         const currentIndex = Number(
                           event.currentTarget.dataset.fallbackIndex || "0"
@@ -116,13 +117,20 @@ export default function Sidebar({ className = "" }: { className?: string }) {
                       }}
                     />
                   ) : (
-                    <span className={`h-4 w-4 rounded text-[9px] font-semibold flex items-center justify-center ${
+                    <span className={`h-4 w-4 rounded text-[9px] font-semibold flex items-center justify-center shrink-0 ${
                       active ? "bg-white/20" : "bg-[var(--border)] text-[var(--muted)]"
                     }`}>
                       {feed.title?.slice(0, 1).toUpperCase() || "?"}
                     </span>
                   )}
-                  <span className="truncate">{feed.title}</span>
+                  <span className="truncate flex-1">{feed.title}</span>
+                  {unreadCounts && unreadCounts[feed.id] > 0 && (
+                    <span className={`text-xs tabular-nums shrink-0 ${
+                      active ? "text-white/80" : "text-[var(--muted)]"
+                    }`}>
+                      {unreadCounts[feed.id]}
+                    </span>
+                  )}
                 </Link>
               );
             })

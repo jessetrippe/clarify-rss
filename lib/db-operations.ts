@@ -379,6 +379,24 @@ export async function getArticleCountsByFeed(): Promise<Record<string, number>> 
 }
 
 /**
+ * Get unread article counts grouped by feed ID
+ * Uses streaming to avoid loading all articles into memory at once
+ */
+export async function getUnreadCountsByFeed(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+
+  // Use .each() to stream through unread articles
+  await db.articles
+    .where("[isRead+isDeleted]")
+    .equals([0, 0])
+    .each((article) => {
+      counts[article.feedId] = (counts[article.feedId] || 0) + 1;
+    });
+
+  return counts;
+}
+
+/**
  * Clear all data (for testing/debugging)
  */
 export async function clearAllData(): Promise<void> {
