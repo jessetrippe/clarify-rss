@@ -292,7 +292,7 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
   if (variant === "feed" && !feedId) {
     return (
-      <div className="text-gray-500 dark:text-gray-400 text-center py-12">
+      <div className="text-[var(--muted)] text-center py-16">
         Invalid feed
       </div>
     );
@@ -300,7 +300,7 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
   if (variant === "feed" && !feed && resolvedArticles.length > 0) {
     return (
-      <div className="text-gray-500 dark:text-gray-400 text-center py-12">
+      <div className="text-[var(--muted)] text-center py-16">
         Feed not found
       </div>
     );

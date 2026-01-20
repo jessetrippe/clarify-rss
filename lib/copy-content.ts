@@ -1,6 +1,7 @@
 // Copy Content utility - the core feature of Clarify RSS
 
 import { htmlToPlainText } from "./sanitize";
+import { uiLogger } from "./logger";
 
 /**
  * Copy article content to clipboard
@@ -56,7 +57,7 @@ export async function copyArticleContent(params: {
 
     return { success: true };
   } catch (error) {
-    console.error("Failed to copy content:", error);
+    uiLogger.error("Failed to copy content:", error);
 
     // Check for permission denied
     if (error instanceof Error && error.name === "NotAllowedError") {

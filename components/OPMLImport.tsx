@@ -8,6 +8,8 @@ import {
   updateFeed,
 } from "@/lib/db-operations";
 import { parseFeedFromApi, discoverFeedsFromApi, type FeedArticleData, type FeedData } from "@/lib/feed-api";
+import { feedLogger } from "@/lib/logger";
+import { cardClass } from "@/components/ui/classes";
 
 interface OPMLImportProps {
   onSuccess?: () => void;
@@ -151,7 +153,7 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
 
           imported++;
         } catch (error) {
-          console.error(`Failed to import feed ${url}:`, error);
+          feedLogger.error(`Failed to import feed ${url}:`, error);
           failed++;
         }
       }
@@ -171,7 +173,7 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
         setTimeout(onSuccess, 1000);
       }
     } catch (error) {
-      console.error("Error importing OPML:", error);
+      feedLogger.error("Error importing OPML:", error);
       setStatus("Error importing OPML file. Please check the file and try again.");
       setIsImporting(false);
 
@@ -183,8 +185,8 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
   };
 
   return (
-    <div className="border border-gray-300 dark:border-gray-700 rounded-lg p-4">
-      <h2 className="text-lg font-bold mb-3">Import OPML</h2>
+    <div className={cardClass}>
+      <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--muted)] mb-3">Import OPML</h2>
 
       <div className="space-y-3">
         <div>
@@ -194,7 +196,7 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
             accept=".opml,.xml"
             onChange={handleFileSelect}
             disabled={isImporting}
-            className="w-full text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer disabled:file:bg-gray-400 disabled:file:cursor-not-allowed"
+            className="w-full text-sm text-[var(--muted)] file:mr-4 file:py-2 file:px-4 file:rounded file:border file:border-[var(--border)] file:text-sm file:font-medium file:bg-[var(--background)] file:text-[var(--foreground)] hover:file:bg-[var(--border)] file:cursor-pointer file:transition-colors disabled:file:opacity-50 disabled:file:cursor-not-allowed"
           />
         </div>
 
@@ -203,17 +205,17 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
             <div
               className={
                 isImporting
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-gray-600 dark:text-gray-400"
+                  ? "text-[var(--accent)]"
+                  : "text-[var(--muted)]"
               }
             >
               {status}
             </div>
             {isImporting && progress.total > 0 && (
               <div className="mt-2">
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-full bg-[var(--border)] rounded-full h-1.5">
                   <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    className="bg-[var(--accent)] h-1.5 rounded-full transition-all"
                     style={{
                       width: `${(progress.current / progress.total) * 100}%`,
                     }}
@@ -225,7 +227,7 @@ export default function OPMLImport({ onSuccess }: OPMLImportProps) {
         )}
       </div>
 
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+      <p className="text-xs text-[var(--muted)] mt-3">
         Select an OPML file exported from another RSS reader to import your
         feeds.
       </p>

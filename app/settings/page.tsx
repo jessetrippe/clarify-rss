@@ -10,6 +10,8 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import PromptDialog from "@/components/PromptDialog";
 import AlertDialog from "@/components/AlertDialog";
 import { supabase } from "@/lib/supabase/client";
+import { uiLogger } from "@/lib/logger";
+import { emptyStateClass } from "@/components/ui/classes";
 
 export default function Settings() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
@@ -44,7 +46,7 @@ export default function Settings() {
       setFeeds(feedsData);
       setFeedCounts(counts);
     } catch (error) {
-      console.error("Error loading feeds:", error);
+      uiLogger.error("Error loading feeds:", error);
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +78,7 @@ export default function Settings() {
       setDeleteDialog({ isOpen: false, feedId: "", feedTitle: "" });
       loadFeeds();
     } catch (error) {
-      console.error("Error deleting feed:", error);
+      uiLogger.error("Error deleting feed:", error);
       setDeleteDialog({ isOpen: false, feedId: "", feedTitle: "" });
       setAlertDialog({
         isOpen: true,
@@ -101,7 +103,7 @@ export default function Settings() {
       setRenameDialog({ isOpen: false, feedId: "", currentTitle: "" });
       loadFeeds();
     } catch (error) {
-      console.error("Error renaming feed:", error);
+      uiLogger.error("Error renaming feed:", error);
       setRenameDialog({ isOpen: false, feedId: "", currentTitle: "" });
       setAlertDialog({
         isOpen: true,
@@ -115,7 +117,7 @@ export default function Settings() {
     try {
       await exportOPML(feeds);
     } catch (error) {
-      console.error("Error exporting OPML:", error);
+      uiLogger.error("Error exporting OPML:", error);
       setAlertDialog({
         isOpen: true,
         title: "Error",
@@ -126,20 +128,20 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div>
-        <h1 className="text-3xl font-bold mb-6">Settings</h1>
-        <div className="text-gray-500 text-center py-12">Loading settings...</div>
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-semibold mb-6 tracking-tight">Settings</h1>
+        <div className="text-[var(--muted)] text-center py-12">Loading settings...</div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           {userEmail && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-[var(--muted)] mt-1">
               Signed in as {userEmail}
             </p>
           )}
@@ -148,22 +150,21 @@ export default function Settings() {
           {feeds.length > 0 && (
             <button
               onClick={handleExportOPML}
-              className="px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              className="px-3 py-1.5 text-sm border border-[var(--border)] text-[var(--foreground)] rounded hover:bg-[var(--border)] transition-colors"
             >
               Export OPML
             </button>
           )}
           <button
             onClick={handleSignOut}
-            className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+            className="px-3 py-1.5 text-sm border border-[var(--border)] text-[var(--muted)] rounded hover:bg-[var(--border)] hover:text-[var(--foreground)] transition-colors"
           >
             Sign out
           </button>
         </div>
       </div>
 
-      <div className="space-y-6">
-        <h2 className="text-xl font-bold">Feeds</h2>
+      <div className="space-y-8">
         {/* Add Feed Form */}
         <AddFeedForm onSuccess={loadFeeds} />
 
@@ -171,59 +172,66 @@ export default function Settings() {
         <OPMLImport onSuccess={loadFeeds} />
 
         {/* Feed List */}
-        {feeds.length === 0 ? (
-          <div className="text-gray-500 dark:text-gray-400 text-center py-12 border border-gray-300 dark:border-gray-700 rounded-lg">
-            <p className="text-lg mb-2">No feeds yet</p>
-            <p className="text-sm">Add your first RSS feed above to get started</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <h3 className="text-lg font-bold">Your Feeds ({feeds.length})</h3>
-            {feeds.map((feed) => (
-              <div
-                key={feed.id}
-                className="border border-gray-300 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h4 className="font-bold text-lg">{feed.title}</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      {feed.url}
-                    </p>
-                    <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                      <span>{feedCounts[feed.id] || 0} articles</span>
-                      {feed.lastFetchedAt && (
-                        <span>
-                          Last updated:{" "}
-                          {new Date(feed.lastFetchedAt).toLocaleDateString()}
-                        </span>
+        <div className="border-t border-[var(--border)] pt-6">
+          <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--muted)] mb-4">
+            Your Feeds {feeds.length > 0 && `(${feeds.length})`}
+          </h2>
+
+          {feeds.length === 0 ? (
+            <div className={emptyStateClass}>
+              <p className="text-base mb-1">No feeds yet</p>
+              <p className="text-sm">Add your first RSS feed above to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {feeds.map((feed) => (
+                <div
+                  key={feed.id}
+                  className="border border-[var(--border)] rounded-lg p-4 hover:bg-[var(--border)]/30 transition-colors"
+                >
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-[var(--foreground)] truncate">{feed.title}</h3>
+                      <p className="text-sm text-[var(--muted)] mt-0.5 truncate">
+                        {feed.url}
+                      </p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs text-[var(--muted)]">
+                        <span>{feedCounts[feed.id] || 0} articles</span>
+                        {feed.lastFetchedAt && (
+                          <>
+                            <span>·</span>
+                            <span>
+                              Updated {new Date(feed.lastFetchedAt).toLocaleDateString()}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {feed.lastError && (
+                        <div className="text-xs text-red-600 dark:text-red-400 mt-2">
+                          Error: {feed.lastError}
+                        </div>
                       )}
                     </div>
-                    {feed.lastError && (
-                      <div className="text-xs text-red-600 dark:text-red-400 mt-2">
-                        Error: {feed.lastError}
-                      </div>
-                    )}
-                  </div>
-                  <div className="ml-4 flex items-center gap-2">
-                    <button
-                      onClick={() => handleRenameFeed(feed.id, feed.title)}
-                      className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      onClick={() => handleDeleteFeed(feed.id, feed.title)}
-                      className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleRenameFeed(feed.id, feed.title)}
+                        className="px-2.5 py-1 text-xs border border-[var(--border)] text-[var(--muted)] rounded hover:bg-[var(--border)] hover:text-[var(--foreground)] transition-colors"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFeed(feed.id, feed.title)}
+                        className="px-2.5 py-1 text-xs text-red-600 border border-red-200 dark:border-red-900 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modals */}

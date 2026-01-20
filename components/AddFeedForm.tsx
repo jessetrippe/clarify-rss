@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { addFeed, getFeedByUrl, addArticle, updateFeed } from "@/lib/db-operations";
 import { parseFeedFromApi, discoverFeedsFromApi, type FeedArticleData } from "@/lib/feed-api";
+import { cardClass, inputClass } from "@/components/ui/classes";
+import { feedLogger } from "@/lib/logger";
 
 interface AddFeedFormProps {
   onSuccess?: () => void;
@@ -91,7 +93,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
         setIsLoading(false);
       }
     } catch (err) {
-      console.error("Error adding feed:", err);
+      feedLogger.error("Error adding feed:", err);
       setError("An error occurred while adding the feed");
       setIsLoading(false);
     }
@@ -104,8 +106,8 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
   };
 
   return (
-    <div className="border border-gray-300 dark:border-gray-700 rounded-lg p-4">
-      <h2 className="text-lg font-bold mb-3">Add Feed</h2>
+    <div className={cardClass}>
+      <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--muted)] mb-3">Add Feed</h2>
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
@@ -114,7 +116,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="Enter feed URL (e.g., https://example.com/feed)"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputClass}
             disabled={isLoading}
           />
         </div>
@@ -125,7 +127,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
 
         {discoveredFeeds.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-[var(--muted)]">
               Try one of these:
             </p>
             <div className="space-y-1">
@@ -134,7 +136,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
                   key={feedUrl}
                   type="button"
                   onClick={() => handleDiscoveredFeedClick(feedUrl)}
-                  className="block w-full text-left px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                  className="block w-full text-left px-3 py-2 text-sm bg-[var(--border)]/50 hover:bg-[var(--border)] rounded transition-colors truncate"
                 >
                   {feedUrl}
                 </button>
@@ -146,7 +148,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+          className="w-full px-4 py-2.5 bg-[var(--accent)] text-white rounded text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
         >
           {isLoading ? "Adding Feed..." : "Add Feed"}
         </button>

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Source_Serif_4 } from "next/font/google";
 import SyncProvider from "@/components/SyncProvider";
 import OfflineIndicator from "@/components/OfflineIndicator";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -6,6 +7,18 @@ import { MobileMenuProvider } from "@/components/MobileMenuProvider";
 import LayoutShell from "@/components/LayoutShell";
 import AuthGate from "@/components/AuthGate";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
+
+const sourceSerif = Source_Serif_4({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-source-serif",
+});
 
 export const metadata: Metadata = {
   title: "Clarify RSS",
@@ -40,8 +53,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="min-h-screen">
+    <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`}>
+      <body className="min-h-screen font-sans">
         <ErrorBoundary>
           <AuthGate>
             <SyncProvider>

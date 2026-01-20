@@ -28,64 +28,51 @@ const ArticleItem = React.memo(function ArticleItem({
   feedName,
   sourcePath,
 }: ArticleItemProps) {
+  const isUnread = article.isRead === 0;
+
   return (
     <Link
       href={`${sourcePath}?article=${encodeURIComponent(article.id)}`}
-      className={`p-4 transition-colors flex items-start justify-between gap-4 border-t-1 border-black/15 dark:border-white/15 ${
-        article.isRead === 0
-          ? "bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
-          : "bg-gray-50 dark:bg-gray-900/60 hover:bg-gray-100 dark:hover:bg-gray-800"
-      }`}
+      className="block px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--border)]/50 transition-colors"
     >
-        <div className="flex-1 min-w-0">
-          {/* Title with unread indicator */}
-          <h3
-            className={`text-lg mb-1 ${
-              article.isRead === 0
-                ? "font-semibold text-gray-900 dark:text-gray-100"
-                : "font-normal text-gray-500 dark:text-gray-500"
-            }`}
-          >
-            {article.title}
-          </h3>
+      {/* Metadata line */}
+      <div className="flex items-center gap-2 text-xs text-[var(--muted)] mb-1">
+        {showFeedName && feedName && (
+          <>
+            <span className="font-medium">{feedName}</span>
+            <span>·</span>
+          </>
+        )}
+        {article.publishedAt && (
+          <span>{format(new Date(article.publishedAt), "MMM d, yyyy")}</span>
+        )}
+        {article.isStarred === 1 && (
+          <>
+            <span>·</span>
+            <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+              <StarIcon className="h-3 w-3" aria-hidden="true" />
+            </span>
+          </>
+        )}
+      </div>
 
-          {/* Summary */}
-          {article.summary && (
-            <p
-              className={`text-sm line-clamp-2 mb-2 ${
-                article.isRead === 0
-                  ? "text-gray-600 dark:text-gray-400"
-                  : "text-gray-400 dark:text-gray-500"
-              }`}
-            >
-              {article.summary}
-            </p>
-          )}
+      {/* Title */}
+      <h3
+        className={`text-base leading-snug ${
+          isUnread
+            ? "font-semibold text-[var(--foreground)]"
+            : "font-normal text-[var(--muted)]"
+        }`}
+      >
+        {article.title}
+      </h3>
 
-          {/* Metadata */}
-          <div
-            className={`flex items-center gap-3 text-xs ${
-              article.isRead === 0
-                ? "text-gray-500"
-                : "text-gray-400 dark:text-gray-500"
-            }`}
-          >
-            {showFeedName && feedName && (
-              <span>{feedName}</span>
-            )}
-            {article.publishedAt && (
-              <span>
-                {format(new Date(article.publishedAt), "MMM d, yyyy 'at' h:mm a")}
-              </span>
-            )}
-            {article.isStarred === 1 && (
-              <span className="inline-flex items-center gap-1 text-yellow-600 font-medium">
-                <StarIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                Starred
-              </span>
-            )}
-          </div>
-        </div>
+      {/* Summary - only show for unread */}
+      {article.summary && isUnread && (
+        <p className="text-sm text-[var(--muted)] line-clamp-2 mt-1">
+          {article.summary}
+        </p>
+      )}
     </Link>
   );
 }, (prevProps, nextProps) => {
@@ -112,15 +99,15 @@ const ArticleList = React.memo(function ArticleList({
 
   if (articles.length === 0) {
     return (
-      <div className="text-gray-500 dark:text-gray-400 text-center py-12 border border-gray-300 dark:border-gray-700 rounded-lg">
-        <p className="text-lg mb-2">No articles yet</p>
+      <div className="py-16 px-4 text-center text-[var(--muted)]">
+        <p className="text-base mb-1">No articles</p>
         <p className="text-sm">Articles will appear here when you add feeds</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col">
+    <>
       {articles.map((article) => (
         <ArticleItem
           key={article.id}
@@ -130,7 +117,7 @@ const ArticleList = React.memo(function ArticleList({
           sourcePath={sourcePath}
         />
       ))}
-    </div>
+    </>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison: only re-render if the filtered articles actually changed

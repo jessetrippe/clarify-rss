@@ -38,3 +38,5 @@ create table if not exists articles (
 create index if not exists idx_articles_user_updated on articles(user_id, updated_at);
 create index if not exists idx_articles_user_feed on articles(user_id, feed_id);
 create index if not exists idx_articles_user_starred on articles(user_id, is_starred);
+create index if not exists idx_articles_user_deleted on articles(user_id, is_deleted);
+create index if not exists idx_feeds_user_deleted on feeds(user_id, is_deleted);

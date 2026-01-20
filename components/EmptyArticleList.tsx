@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { emptyStateClass } from "@/components/ui/classes";
 
 interface EmptyArticleListProps {
   hasArticles: boolean;
@@ -12,7 +13,7 @@ export default function EmptyArticleList({
   showSettingsLink,
 }: EmptyArticleListProps) {
   return (
-    <div className="text-gray-500 dark:text-gray-400 text-center py-12 border border-gray-300 dark:border-gray-700 rounded-lg">
+    <div className={emptyStateClass}>
       <p className="text-lg mb-2">
         {hasArticles ? "No unread articles" : "No articles yet"}
       </p>

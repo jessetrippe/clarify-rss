@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { cursorFromRow, parseCursor } from "@/lib/server/cursor";
 
 export interface SyncPullRequest {
@@ -77,7 +77,7 @@ export async function syncPull(
   const feedCursorParts = parseCursor(feedCursor);
   const articleCursorParts = parseCursor(articleCursor);
 
-  let feedsQuery = supabaseAdmin
+  let feedsQuery = getSupabaseAdmin()
     .from("feeds")
     .select("*")
     .eq("user_id", userId);
@@ -101,7 +101,7 @@ export async function syncPull(
     throw new Error(feedsError.message);
   }
 
-  let articlesQuery = supabaseAdmin
+  let articlesQuery = getSupabaseAdmin()
     .from("articles")
     .select("*")
     .eq("user_id", userId);
@@ -166,84 +166,114 @@ export async function syncPush(
   let articlesProcessed = 0;
   let conflicts = 0;
 
-  for (const feed of request.feeds) {
-    const { data: existing, error } = await supabaseAdmin
+  // Process feeds in batches
+  if (request.feeds.length > 0) {
+    const feedIds = request.feeds.map((f) => f.id);
+
+    // Batch fetch existing feeds
+    const { data: existingFeeds, error: feedsFetchError } = await getSupabaseAdmin()
       .from("feeds")
       .select("updated_at,id")
       .eq("user_id", userId)
-      .eq("id", feed.id)
-      .maybeSingle<{ updated_at: number; id: string }>();
+      .in("id", feedIds);
 
-    if (error) {
-      throw new Error(error.message);
+    if (feedsFetchError) {
+      throw new Error(feedsFetchError.message);
     }
 
-    if (existing) {
-      const serverNewer = existing.updated_at > feed.updated_at;
-      const sameTimeServerWins =
-        existing.updated_at === feed.updated_at && existing.id > feed.id;
+    const existingFeedsMap = new Map(
+      (existingFeeds || []).map((f) => [f.id, f])
+    );
 
-      if (serverNewer || sameTimeServerWins) {
-        conflicts++;
-        continue;
+    // Determine which feeds to upsert (client wins or new)
+    const feedsToUpsert: (FeedRow & { user_id: string })[] = [];
+
+    for (const feed of request.feeds) {
+      const existing = existingFeedsMap.get(feed.id);
+
+      if (existing) {
+        const serverNewer = existing.updated_at > feed.updated_at;
+        const sameTimeServerWins =
+          existing.updated_at === feed.updated_at && existing.id > feed.id;
+
+        if (serverNewer || sameTimeServerWins) {
+          conflicts++;
+          continue;
+        }
       }
+
+      feedsToUpsert.push({ ...feed, user_id: userId });
     }
 
-    const { error: upsertError } = await supabaseAdmin
-      .from("feeds")
-      .upsert(
-        {
-          ...feed,
-          user_id: userId,
-        },
-        { onConflict: "id" }
-      );
+    // Batch upsert feeds
+    if (feedsToUpsert.length > 0) {
+      const { error: upsertError } = await getSupabaseAdmin()
+        .from("feeds")
+        .upsert(feedsToUpsert, { onConflict: "id" });
 
-    if (upsertError) {
-      throw new Error(upsertError.message);
+      if (upsertError) {
+        throw new Error(upsertError.message);
+      }
+
+      feedsProcessed = feedsToUpsert.length;
     }
-
-    feedsProcessed++;
   }
 
-  for (const article of request.articles) {
-    const { data: existing, error } = await supabaseAdmin
-      .from("articles")
-      .select("updated_at,id")
-      .eq("user_id", userId)
-      .eq("id", article.id)
-      .maybeSingle<{ updated_at: number; id: string }>();
+  // Process articles in batches (chunk to avoid hitting query limits)
+  const BATCH_SIZE = 100;
 
-    if (error) {
-      throw new Error(error.message);
+  for (let i = 0; i < request.articles.length; i += BATCH_SIZE) {
+    const articleBatch = request.articles.slice(i, i + BATCH_SIZE);
+    const articleIds = articleBatch.map((a) => a.id);
+
+    // Batch fetch existing articles
+    const { data: existingArticles, error: articlesFetchError } =
+      await getSupabaseAdmin()
+        .from("articles")
+        .select("updated_at,id")
+        .eq("user_id", userId)
+        .in("id", articleIds);
+
+    if (articlesFetchError) {
+      throw new Error(articlesFetchError.message);
     }
 
-    if (existing) {
-      const serverNewer = existing.updated_at > article.updated_at;
-      const sameTimeServerWins =
-        existing.updated_at === article.updated_at && existing.id > article.id;
+    const existingArticlesMap = new Map(
+      (existingArticles || []).map((a) => [a.id, a])
+    );
 
-      if (serverNewer || sameTimeServerWins) {
-        conflicts++;
-        continue;
+    // Determine which articles to upsert (client wins or new)
+    const articlesToUpsert: (ArticleRow & { user_id: string })[] = [];
+
+    for (const article of articleBatch) {
+      const existing = existingArticlesMap.get(article.id);
+
+      if (existing) {
+        const serverNewer = existing.updated_at > article.updated_at;
+        const sameTimeServerWins =
+          existing.updated_at === article.updated_at && existing.id > article.id;
+
+        if (serverNewer || sameTimeServerWins) {
+          conflicts++;
+          continue;
+        }
       }
+
+      articlesToUpsert.push({ ...article, user_id: userId });
     }
 
-    const { error: upsertError } = await supabaseAdmin
-      .from("articles")
-      .upsert(
-        {
-          ...article,
-          user_id: userId,
-        },
-        { onConflict: "id" }
-      );
+    // Batch upsert articles
+    if (articlesToUpsert.length > 0) {
+      const { error: upsertError } = await getSupabaseAdmin()
+        .from("articles")
+        .upsert(articlesToUpsert, { onConflict: "id" });
 
-    if (upsertError) {
-      throw new Error(upsertError.message);
+      if (upsertError) {
+        throw new Error(upsertError.message);
+      }
+
+      articlesProcessed += articlesToUpsert.length;
     }
-
-    articlesProcessed++;
   }
 
   return {

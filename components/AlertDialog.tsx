@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import {
+  buttonPrimaryClass,
+  dialogBackdropClass,
+  dialogMessageClass,
+  dialogOverlayClass,
+  dialogPanelClass,
+  dialogTitleClass,
+} from "@/components/ui/classes";
 
 interface AlertDialogProps {
   isOpen: boolean;
@@ -40,10 +48,10 @@ export default function AlertDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className={dialogOverlayClass}>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 transition-opacity"
+        className={dialogBackdropClass}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -51,24 +59,24 @@ export default function AlertDialog({
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
+        className={dialogPanelClass}
         role="dialog"
         aria-modal="true"
         aria-labelledby="alert-title"
       >
         <h2
           id="alert-title"
-          className="text-xl font-bold mb-3 text-gray-900 dark:text-white"
+          className={dialogTitleClass}
         >
           {title}
         </h2>
 
-        <p className="text-gray-700 dark:text-gray-300 mb-6">{message}</p>
+        <p className={dialogMessageClass}>{message}</p>
 
         <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+            className={buttonPrimaryClass}
           >
             {confirmLabel}
           </button>

@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import { feedLogger } from "@/lib/logger";
 
 const parser = new Parser({
   timeout: 10000,
@@ -102,7 +103,7 @@ export async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
       articles,
     };
   } catch (error) {
-    console.error("Feed parsing error:", error);
+    feedLogger.error("Feed parsing error:", error);
     throw new Error(
       `Failed to parse feed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -163,7 +164,7 @@ export async function discoverFeeds(url: string): Promise<string[]> {
 
     return [...new Set(feeds)];
   } catch (error) {
-    console.error("Feed discovery error:", error);
+    feedLogger.error("Feed discovery error:", error);
     return [];
   }
 }

@@ -22,6 +22,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { createMapCacheManager } from "@/lib/cache";
+import { uiLogger } from "@/lib/logger";
+import { emptyStateClass } from "@/components/ui/classes";
 
 // Global cache for articles to enable instant navigation
 type CachedArticleData = { article: Article; feed: Feed | null };
@@ -116,11 +118,11 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
               }
             })
             .catch((error) => {
-              console.error("Failed to mark article as read:", error);
+              uiLogger.error("Failed to mark article as read:", error);
             });
         }
       } catch (error) {
-        console.error("Error loading article:", error);
+        uiLogger.error("Error loading article:", error);
         if (mounted) {
           setArticleState(prev => ({ ...prev, isLoading: false }));
         }
@@ -320,93 +322,94 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
 
   if (!article) {
     return (
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-6 xl:hidden">
+      <div>
+        <div className="mb-4 xl:hidden">
           <button
             onClick={onBack}
-            className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+            className="text-[var(--muted)] hover:text-[var(--foreground)] text-sm transition-colors"
           >
-            ← Back
+            ← Back to list
           </button>
         </div>
-        <div className="text-gray-500 text-center py-12">Article not found</div>
+        <div className="text-[var(--muted)] text-center py-12">Article not found</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div>
       {/* Back button - only on mobile */}
-      <div className="mb-6 xl:hidden">
+      <div className="mb-4 xl:hidden">
         <button
           onClick={onBack}
-          className="text-blue-600 dark:text-blue-400 hover:underline text-sm transition-colors duration-200"
+          className="text-[var(--muted)] hover:text-[var(--foreground)] text-sm transition-colors"
         >
-          ← Back
+          ← Back to list
         </button>
       </div>
 
       {/* Article Header */}
-      <article>
-        <header className="mb-6">
-          <h1 className="text-4xl font-bold mb-3">{article.title}</h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400 mb-4">
+      <article className="max-w-2xl mx-auto">
+        <header className="mb-8 pb-6 border-b border-[var(--border)]">
+          <h1 className="text-3xl md:text-4xl font-bold mb-4 leading-tight tracking-tight text-balance">
+            {article.title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--muted)]">
             {feed && (
               <Link
                 href={`/feeds/${feed.id}`}
-                className="hover:text-blue-600 dark:hover:text-blue-400"
+                className="font-medium hover:text-[var(--accent)]"
               >
                 {feed.title}
               </Link>
             )}
+            {feed && article.publishedAt && <span>·</span>}
             {article.publishedAt && (
-              <span>{format(new Date(article.publishedAt), "PPP 'at' p")}</span>
+              <span>{format(new Date(article.publishedAt), "MMMM d, yyyy")}</span>
             )}
             {article.url && (
-              <a
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-blue-600 dark:hover:text-blue-400"
-              >
-                View original →
-              </a>
+              <>
+                <span>·</span>
+                <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[var(--accent)]"
+                >
+                  Original
+                </a>
+              </>
             )}
           </div>
         </header>
 
         {/* Actions */}
-        <div className="mb-6 flex flex-wrap gap-3">
+        <div className="mb-8 flex flex-wrap items-center gap-4">
           <button
             onClick={handleCopyContent}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium inline-flex items-center gap-2"
+            className="px-3 py-1.5 text-sm font-medium text-[var(--accent)] border border-[var(--accent)] rounded hover:bg-[var(--accent)] hover:text-white transition-colors inline-flex items-center gap-1.5"
           >
             <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
             Copy
           </button>
           <button
             onClick={handleToggleStarred}
-            className={`px-4 py-2 rounded-md font-medium inline-flex items-center gap-2 ${
+            className={`px-3 py-1.5 text-sm font-medium rounded transition-colors inline-flex items-center gap-1.5 ${
               article.isStarred === 1
-                ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                ? "text-amber-600 dark:text-amber-400 border border-amber-500 hover:bg-amber-500 hover:text-white"
+                : "text-[var(--muted)] border border-[var(--border)] hover:border-[var(--muted)] hover:text-[var(--foreground)]"
             }`}
           >
             {article.isStarred === 1 ? (
-              <>
-                <StarSolidIcon className="h-4 w-4" aria-hidden="true" />
-                Starred
-              </>
+              <StarSolidIcon className="h-4 w-4" aria-hidden="true" />
             ) : (
-              <>
-                <StarOutlineIcon className="h-4 w-4" aria-hidden="true" />
-                Star
-              </>
+              <StarOutlineIcon className="h-4 w-4" aria-hidden="true" />
             )}
+            {article.isStarred === 1 ? "Starred" : "Star"}
           </button>
           <button
             onClick={handleToggleRead}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 font-medium"
+            className="px-3 py-1.5 text-sm font-medium text-[var(--muted)] border border-[var(--border)] rounded hover:border-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
           >
             {article.isRead === 1 ? "Mark Unread" : "Mark Read"}
           </button>
@@ -415,10 +418,10 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
         {/* Copy Status */}
         {copyStatus && (
           <div
-            className={`mb-6 p-3 rounded-md text-sm ${
+            className={`mb-6 px-3 py-2 rounded text-sm ${
               copyStatus.startsWith("✓")
-                ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"
-                : "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200"
+                ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
+                : "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
             }`}
           >
             {copyStatus}
@@ -461,7 +464,7 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
         )}
 
         {/* Article Content */}
-        <div className="prose prose-slate dark:prose-invert max-w-none">
+        <div className="article-content">
           {article.content ? (
             <div
               dangerouslySetInnerHTML={{ __html: sanitizeHTML(article.content) }}
@@ -483,7 +486,7 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
               )}
             </div>
           ) : (
-            <div className="text-gray-500 dark:text-gray-400 text-center py-12 border border-gray-300 dark:border-gray-700 rounded-lg">
+            <div className={emptyStateClass}>
               <p className="mb-4">No content available for this article.</p>
               {article.url && (
                 <a

@@ -4,6 +4,7 @@ import { db } from "./db";
 import type { Feed, Article } from "./types";
 import { getSyncState, updateSyncState } from "./db-operations";
 import { getAccessToken } from "@/lib/supabase/auth";
+import { syncLogger } from "@/lib/logger";
 
 // API base URL (localhost for development, will be replaced with actual domain in production)
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -155,7 +156,7 @@ export class SyncService {
       }
 
       if (iterations >= MAX_SYNC_ITERATIONS) {
-        console.warn("Sync pull reached maximum iterations limit");
+        syncLogger.warn("Sync pull reached maximum iterations limit");
       }
 
       // Update sync state
@@ -181,7 +182,7 @@ export class SyncService {
           error.message.includes("Network request failed"));
 
       if (!isNetworkError) {
-        console.error("Sync pull error:", errorMessage);
+        syncLogger.error("Sync pull error:", errorMessage);
       }
       return {
         success: false,
@@ -280,7 +281,7 @@ export class SyncService {
           error.message.includes("Network request failed"));
 
       if (!isNetworkError) {
-        console.error("Sync push error:", errorMessage);
+        syncLogger.error("Sync push error:", errorMessage);
       }
       return {
         success: false,

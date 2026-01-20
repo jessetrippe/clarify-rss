@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import {
+  buttonDangerClass,
+  buttonPrimaryClass,
+  buttonSecondaryClass,
+  dialogBackdropClass,
+  dialogMessageClass,
+  dialogOverlayClass,
+  dialogPanelClass,
+  dialogTitleClass,
+} from "@/components/ui/classes";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -47,14 +57,14 @@ export default function ConfirmDialog({
 
   const confirmButtonClass =
     variant === "danger"
-      ? "px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium"
-      : "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium";
+      ? buttonDangerClass
+      : buttonPrimaryClass;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className={dialogOverlayClass}>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 transition-opacity"
+        className={dialogBackdropClass}
         onClick={onCancel}
         aria-hidden="true"
       />
@@ -62,24 +72,24 @@ export default function ConfirmDialog({
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
+        className={dialogPanelClass}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
       >
         <h2
           id="dialog-title"
-          className="text-xl font-bold mb-3 text-gray-900 dark:text-white"
+          className={dialogTitleClass}
         >
           {title}
         </h2>
 
-        <p className="text-gray-700 dark:text-gray-300 mb-6">{message}</p>
+        <p className={dialogMessageClass}>{message}</p>
 
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 font-medium"
+            className={buttonSecondaryClass}
           >
             {cancelLabel}
           </button>
