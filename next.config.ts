@@ -1,20 +1,40 @@
 import type { NextConfig } from "next";
+import TerserPlugin from "terser-webpack-plugin";
 import withPWA from "@ducanh2912/next-pwa";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  webpack: (config) => {
+    if (config.optimization?.minimizer) {
+      config.optimization.minimizer = config.optimization.minimizer.map(
+        (plugin: unknown) => {
+          if (plugin instanceof TerserPlugin) {
+            return new TerserPlugin({
+              parallel: false,
+              extractComments: false,
+            });
+          }
+          return plugin;
+        }
+      );
+    }
+    return config;
+  },
 };
 
 // PWA configuration - use type assertion for options that may not be in type definitions
 const pwaConfig = {
   dest: "public",
-  disable: process.env.NODE_ENV === "development",
+  disable:
+    process.env.NODE_ENV === "development" ||
+    process.env.NEXT_PWA_DISABLE === "true",
   register: true,
   skipWaiting: true,
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   workboxOptions: {
+    mode: process.env.NEXT_PWA_MODE || "production",
     disableDevLogs: true,
     runtimeCaching: [
       {

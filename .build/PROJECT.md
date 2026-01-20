@@ -27,7 +27,7 @@ A comprehensive code review was performed and all identified issues have been fi
 #### Performance & Reliability
 - **Request timeouts** - Added 30-second timeouts to all API calls
 - **Retry logic** - Added exponential backoff for feed fetching with transient error detection
-- **Sync batching** - Batched D1 database operations for better performance
+- **Sync batching** - Batched database operations for better performance
 - **Cache TTL** - Added time-based cache invalidation
 
 #### Memory & Resource Management
@@ -44,7 +44,7 @@ A comprehensive code review was performed and all identified issues have been fi
 - `lib/logger.ts` - Environment-aware logging utility
 - `lib/validation.ts` - URL and string validation functions
 - `lib/retry.ts` - Retry with exponential backoff
-- `workers/src/rate-limiter.ts` - Rate limiting for worker endpoints
+- `lib/server/rate-limiter.ts` - Rate limiting for API routes
 
 ### Deployment Decision (2026-01-18)
 
@@ -58,7 +58,7 @@ A comprehensive code review was performed and all identified issues have been fi
 
 - Two-pane split layout with sidebar navigation and list/detail views
 - Settings moved to `/settings` with feeds management inside
-- Feed parsing/discovery handled by backend Worker (mock parser removed)
+- Feed parsing/discovery handled by backend API routes (mock parser removed)
 - Per-list Unread/All toggle with persistence
 - Feed icons supported (feed-provided icon or favicon fallback)
 - Heroicons added for consistent UI icons
@@ -137,7 +137,7 @@ Clarify RSS is designed to solve this problem by providing:
 - Rate limiting:
   - Respect feed-level cache headers (ETag, Last-Modified)
   - Minimum 5-minute interval between refreshes per feed
-  - Cloudflare Workers handle conditional GET requests
+  - API routes handle conditional GET requests
 - Error handling:
   - Feed fetch failures show error message with last successful fetch time
   - Retry on next manual refresh
@@ -501,93 +501,54 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ---
 
-## Phase 4: Backend Infrastructure (Cloudflare)
+## Phase 4: Backend Infrastructure (Supabase)
 
-**Goal:** Set up Cloudflare Workers, D1 database, and basic API structure
+**Goal:** Set up Supabase Postgres and Next.js API routes for sync and feed parsing
 **Estimated Sessions:** 3-4
 **Dependencies:** Phase 3 (local app working)
 
 ### Tasks
 
-1. **Initialize Cloudflare Workers project**
-   - Install Wrangler CLI: `npm install -g wrangler`
-   - Create `workers/` directory
-   - Initialize worker: `wrangler init sync-api`
-   - Configure `wrangler.toml`
+1. **Create Supabase project**
+   - Enable Magic Link auth
+   - Set redirect URLs for local + production
 
-2. **Create D1 database**
-   - `wrangler d1 create clarify-rss-db`
-   - Update `wrangler.toml` with database binding
+2. **Database schema** (`supabase/schema.sql`)
+   - Create feeds and articles tables
+   - Add indexes for sync performance
 
-3. **Database schema** (`workers/schema.sql`)
-   ```sql
-   CREATE TABLE feeds (
-     id TEXT PRIMARY KEY,
-     url TEXT UNIQUE NOT NULL,
-     title TEXT NOT NULL,
-     last_fetched_at INTEGER,
-     last_error TEXT,
-     created_at INTEGER NOT NULL,
-     updated_at INTEGER NOT NULL,
-     is_deleted INTEGER NOT NULL DEFAULT 0
-   );
+3. **Row Level Security** (`supabase/rls.sql`)
+   - Enable RLS on feeds and articles
+   - Policies scoped to `user_id`
 
-   CREATE TABLE articles (
-     id TEXT PRIMARY KEY,
-     feed_id TEXT NOT NULL,
-     guid TEXT,
-     url TEXT,
-     title TEXT NOT NULL,
-     content TEXT,
-     summary TEXT,
-     published_at INTEGER,
-     is_read INTEGER NOT NULL DEFAULT 0,
-     is_starred INTEGER NOT NULL DEFAULT 0,
-     created_at INTEGER NOT NULL,
-     updated_at INTEGER NOT NULL,
-     is_deleted INTEGER NOT NULL DEFAULT 0,
-     FOREIGN KEY (feed_id) REFERENCES feeds(id)
-   );
-
-   CREATE INDEX idx_articles_feed_id ON articles(feed_id);
-   CREATE INDEX idx_articles_published_at ON articles(published_at);
-   CREATE INDEX idx_articles_is_starred ON articles(is_starred);
-   CREATE INDEX idx_articles_is_deleted ON articles(is_deleted);
-   CREATE INDEX idx_feeds_is_deleted ON feeds(is_deleted);
-   ```
-
-4. **Run migrations**
-   - `wrangler d1 execute clarify-rss-db --file=workers/schema.sql`
-
-5. **API endpoints** (`workers/src/index.ts`)
+4. **API routes** (`app/api/*`)
    - `POST /api/sync/pull` - Pull changes from server
    - `POST /api/sync/push` - Push changes to server
-   - `POST /api/feeds/refresh` - Trigger feed refresh
-   - `GET /api/feeds/:id` - Get single feed
-   - Basic request validation
-   - Error handling with proper HTTP status codes
+   - `POST /api/feeds/parse` - Parse RSS/Atom feed
+   - `POST /api/feeds/discover` - Discover feeds from URL
+   - `POST /api/articles/extract` - Extract full content
+   - `GET /api/health` - Health check
 
-6. **Sync logic** (`workers/src/sync.ts`)
-   - Pull: Return changes since cursor (updatedAt timestamp)
-   - Push: Accept changes, resolve conflicts (last write wins)
-   - Return new cursor
-   - Batch size: 100 items
+5. **Server helpers** (`lib/server/*`)
+   - Sync logic and cursor handling
+   - Rate limiting
+   - Feed parsing + extraction
 
-7. **Testing**
-   - Test locally: `wrangler dev`
-   - Test API endpoints with curl or Postman
-   - Verify D1 queries work correctly
+6. **Testing**
+   - `npm run dev`
+   - `curl http://localhost:3000/api/health`
+   - Verify sync and feed parsing
 
 ### Deliverables
 
-- ✅ Cloudflare Worker running locally
-- ✅ D1 database created with schema
-- ✅ Sync API endpoints responding
-- ✅ Can push/pull data via API
+- ✅ Supabase schema created
+- ✅ RLS policies enabled
+- ✅ API routes responding
+- ✅ Sync push/pull operational
 
 ### Checkpoint
 
-- Commit: `"feat: Cloudflare Workers backend with D1 and sync API"`
+- Commit: `"feat: Supabase backend with Next.js API routes"`
 
 ---
 
@@ -599,20 +560,20 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 
 ### Tasks
 
-1. **RSS parsing in Worker** (`workers/src/feed-fetcher.ts`)
-   - Install rss-parser in workers project
+1. **RSS parsing in API routes** (`lib/server/feed-fetcher.ts`)
+   - Use rss-parser server-side
    - Fetch feed URL
    - Parse RSS/Atom with rss-parser
    - Extract articles (guid, url, title, content, summary, publishedAt)
    - Handle parsing errors gracefully
 
-2. **Feed auto-discovery** (`workers/src/feed-discovery.ts`)
+2. **Feed auto-discovery** (`lib/server/feed-fetcher.ts`)
    - When feed URL fails to parse, fetch as HTML
    - Parse HTML for `<link rel="alternate" type="application/rss+xml">`
    - Return discovered feed URLs
    - Support common patterns (/feed, /rss, /atom.xml)
 
-3. **Rate limiting** (`workers/src/rate-limiter.ts`)
+3. **Rate limiting** (`lib/server/rate-limiter.ts`)
    - Track last fetch time per feed
    - Enforce 5-minute minimum between fetches
    - Respect ETag and Last-Modified headers
@@ -758,25 +719,17 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
    - Check for any exposed secrets or API keys
    - Ensure HTTPS only
 
-3. **Deploy frontend to Cloudflare Pages**
-   - Connect GitHub repo to Cloudflare Pages
-   - Configure build: `npm run build`
-   - Configure environment variables (if any)
+3. **Deploy to Netlify**
+   - Connect GitHub repo to Netlify
+   - Configure build: `npm run build -- --webpack`
+   - Configure environment variables (Supabase keys)
    - Deploy to production
-   - Custom domain (optional)
+   - Custom domain with HTTPS
 
-4. **Deploy Workers to production**
-   - `wrangler deploy`
-   - Verify D1 database binding in production
-   - Run migrations on production database
-   - Test API endpoints in production
-
-5. **Configure Cloudflare Access**
-   - Set up Zero Trust dashboard
-   - Create Access policy for your email
-   - Protect entire site and API routes
-   - Test that unauthenticated requests are blocked
-   - Test that authenticated requests work
+4. **Configure Supabase Auth**
+   - Set Site URL and redirect URLs
+   - Disable open signups (single-user mode)
+   - Verify magic link login flow
 
 6. **UI Polish**
    - Consistent spacing and typography
@@ -819,7 +772,7 @@ This document outlines the implementation plan for Clarify RSS, a local-first PW
 ### Deliverables
 
 - ✅ App deployed to production
-- ✅ Cloudflare Access protecting all routes
+- ✅ Supabase Auth protecting all routes
 - ✅ All security measures implemented
 - ✅ App tested on Mac and iPhone
 - ✅ Performance targets met
@@ -927,7 +880,7 @@ Use this checklist to verify functionality at the end of the project.
 - [x] Icons display correctly
 
 ### Security
-- [ ] Cloudflare Access protects all routes
+- [ ] Supabase Auth protects all routes
 - [x] DOMPurify sanitizes all HTML (re-sanitizes after DOM modifications)
 - [ ] CSP policy enforced
 - [x] External links have noopener/noreferrer

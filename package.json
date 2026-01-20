@@ -26,7 +26,6 @@
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260113.0",
     "@next/bundle-analyzer": "^16.1.1",
     "@tailwindcss/typography": "^0.5.16",
     "@types/dompurify": "^3.0.5",
@@ -38,7 +37,6 @@
     "eslint-config-next": "^16.1.1",
     "postcss": "^8",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5",
-    "wrangler": "^4.58.0"
+    "typescript": "^5"
   }
 }
