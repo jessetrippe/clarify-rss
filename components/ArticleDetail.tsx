@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import {
@@ -25,6 +25,35 @@ import { articleCache } from "@/lib/article-cache";
 import { uiLogger } from "@/lib/logger";
 import { emptyStateClass } from "@/components/ui/classes";
 import Toast from "@/components/ui/Toast";
+import { getTextLength } from "@/lib/html-utils";
+
+/**
+ * Check if content appears truncated (common patterns from RSS feeds)
+ */
+function isTruncatedContent(content: string | undefined, summary?: string): boolean {
+  if (!content) return false;
+  const trimmed = content.trim();
+  const contentLength = getTextLength(content);
+  const summaryLength = getTextLength(summary);
+
+  // Common truncation patterns
+  const hasTruncationMarkers =
+    trimmed.endsWith('…') ||
+    trimmed.endsWith('...') ||
+    trimmed.includes('Read the full story at') ||
+    trimmed.includes('Continue reading') ||
+    trimmed.includes('[...]') ||
+    trimmed.includes('Read more');
+
+  // Likely just a summary or preview blurb
+  const isSummaryLength =
+    contentLength > 0 &&
+    contentLength < 600 &&
+    summaryLength > 0 &&
+    contentLength <= summaryLength + 40;
+
+  return hasTruncationMarkers || isSummaryLength;
+}
 
 interface ArticleDetailProps {
   articleId: string;
@@ -187,62 +216,32 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
     }
   }, [article?.id, article?.url]);
 
-  // Auto-trigger extraction when article loads
-  useEffect(() => {
-    if (!article) return;
-
-    // Check if content appears truncated (common patterns from RSS feeds)
-    const getTextLength = (html?: string): number => {
-      if (!html) return 0;
-      return html
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .length;
-    };
-
-    const isTruncatedContent = (content: string | undefined, summary?: string): boolean => {
-      if (!content) return false;
-      const trimmed = content.trim();
-      const contentLength = getTextLength(content);
-      const summaryLength = getTextLength(summary);
-
-      // Common truncation patterns
-      const hasTruncationMarkers =
-        trimmed.endsWith('…') ||
-        trimmed.endsWith('...') ||
-        trimmed.includes('Read the full story at') ||
-        trimmed.includes('Continue reading') ||
-        trimmed.includes('[...]') ||
-        trimmed.includes('Read more');
-
-      // Likely just a summary or preview blurb
-      const isSummaryLength =
-        contentLength > 0 &&
-        contentLength < 600 &&
-        summaryLength > 0 &&
-        contentLength <= summaryLength + 40;
-
-      return hasTruncationMarkers || isSummaryLength;
-    };
+  // Memoize extraction check to avoid recalculating on every render
+  const shouldAutoExtract = useMemo(() => {
+    if (!article) return false;
 
     // Check if we should auto-extract:
     // - Has no content, OR has truncated content
     // - Has a URL to extract from
     // - Hasn't already been extracted (completed or failed)
-    // - We haven't already attempted extraction for this article
     const needsExtraction =
       !article.content || isTruncatedContent(article.content, article.summary);
-    const shouldExtract =
-      needsExtraction &&
-      article.url &&
-      article.extractionStatus !== 'failed' &&
-      extractionAttemptedRef.current !== article.id;
 
-    if (shouldExtract) {
+    return (
+      needsExtraction &&
+      !!article.url &&
+      article.extractionStatus !== 'completed' &&
+      article.extractionStatus !== 'failed'
+    );
+  }, [article?.id, article?.content, article?.summary, article?.url, article?.extractionStatus]);
+
+  // Auto-trigger extraction when article loads
+  useEffect(() => {
+    // Only extract if check passes AND we haven't attempted for this article yet
+    if (shouldAutoExtract && extractionAttemptedRef.current !== article?.id) {
       handleExtractContent();
     }
-  }, [article, handleExtractContent]);
+  }, [shouldAutoExtract, article?.id, handleExtractContent]);
 
   if (!articleId) {
     return (

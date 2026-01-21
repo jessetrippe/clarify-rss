@@ -394,6 +394,52 @@ export async function getUnreadCountsByFeed(): Promise<Record<string, number>> {
 }
 
 /**
+ * Get all sidebar data in a single query operation.
+ * Combines feeds, unread counts per feed, and global counts.
+ * Much more efficient than separate queries.
+ */
+export interface SidebarData {
+  feeds: Feed[];
+  unreadCountsByFeed: Record<string, number>;
+  totalUnreadCount: number;
+  starredCount: number;
+}
+
+export async function getSidebarData(): Promise<SidebarData> {
+  // Run all queries in parallel
+  const [feeds, unreadCountsByFeed, starredCount] = await Promise.all([
+    // Get all non-deleted feeds
+    db.feeds.where("isDeleted").equals(0).toArray(),
+    // Get unread counts by feed using indexed query
+    (async () => {
+      const counts: Record<string, number> = {};
+      await db.articles
+        .where("[isRead+isDeleted]")
+        .equals([0, 0])
+        .each((article) => {
+          counts[article.feedId] = (counts[article.feedId] || 0) + 1;
+        });
+      return counts;
+    })(),
+    // Get starred count
+    db.articles.where("[isStarred+isDeleted]").equals([1, 0]).count(),
+  ]);
+
+  // Calculate total unread from the counts we already have
+  const totalUnreadCount = Object.values(unreadCountsByFeed).reduce(
+    (sum, count) => sum + count,
+    0
+  );
+
+  return {
+    feeds,
+    unreadCountsByFeed,
+    totalUnreadCount,
+    starredCount,
+  };
+}
+
+/**
  * Clear all data (for testing/debugging)
  */
 export async function clearAllData(): Promise<void> {

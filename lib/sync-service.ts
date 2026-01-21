@@ -86,49 +86,77 @@ export class SyncService {
           throw new Error("Sync loop detected: cursors not advancing");
         }
 
-        // Merge feeds into local database
-        for (const feed of feeds) {
-          const existing = await db.feeds.get(feed.id);
-          const localUpdatedAt = existing?.updatedAt?.getTime() ?? 0;
-          const serverUpdatedAt = normalizeTimestamp(feed.updated_at);
+        // Merge feeds into local database using bulk operations
+        if (feeds.length > 0) {
+          const feedIds = feeds.map((f: { id: string }) => f.id);
+          const existingFeeds = await db.feeds.bulkGet(feedIds);
+          const existingFeedsMap = new Map(
+            existingFeeds.filter(Boolean).map((f) => [f!.id, f!])
+          );
 
-          // Only update if server version is newer or doesn't exist locally
-          if (!existing || localUpdatedAt < serverUpdatedAt) {
-            await db.feeds.put({
-              ...feed,
-              iconUrl: existing?.iconUrl,
-              lastFetchedAt: feed.last_fetched_at ? new Date(normalizeTimestamp(feed.last_fetched_at)) : undefined,
-              createdAt: new Date(normalizeTimestamp(feed.created_at)),
-              updatedAt: new Date(serverUpdatedAt),
-              isDeleted: typeof feed.is_deleted === "number" ? feed.is_deleted : 0,
-            });
+          const feedsToUpdate: Feed[] = [];
+          for (const feed of feeds) {
+            const existing = existingFeedsMap.get(feed.id);
+            const localUpdatedAt = existing?.updatedAt?.getTime() ?? 0;
+            const serverUpdatedAt = normalizeTimestamp(feed.updated_at);
+
+            if (!existing || localUpdatedAt < serverUpdatedAt) {
+              feedsToUpdate.push({
+                ...feed,
+                iconUrl: existing?.iconUrl,
+                lastFetchedAt: feed.last_fetched_at ? new Date(normalizeTimestamp(feed.last_fetched_at)) : undefined,
+                createdAt: new Date(normalizeTimestamp(feed.created_at)),
+                updatedAt: new Date(serverUpdatedAt),
+                isDeleted: typeof feed.is_deleted === "number" ? feed.is_deleted : 0,
+              });
+            }
+          }
+
+          if (feedsToUpdate.length > 0) {
+            await db.feeds.bulkPut(feedsToUpdate);
           }
         }
 
-        // Merge articles into local database
-        for (const article of articles) {
-          const existing = await db.articles.get(article.id);
-          const localUpdatedAt = existing?.updatedAt?.getTime() ?? 0;
-          const serverUpdatedAt = normalizeTimestamp(article.updated_at);
+        // Merge articles into local database using bulk operations
+        if (articles.length > 0) {
+          const articleIds = articles.map((a: { id: string }) => a.id);
+          const existingArticles = await db.articles.bulkGet(articleIds);
+          const existingArticlesMap = new Map(
+            existingArticles.filter(Boolean).map((a) => [a!.id, a!])
+          );
 
-          // Only update if server version is newer or doesn't exist locally
-          if (!existing || localUpdatedAt < serverUpdatedAt) {
-            await db.articles.put({
-              ...article,
-              feedId: article.feed_id,
-              publishedAt: article.published_at ? new Date(normalizeTimestamp(article.published_at)) : undefined,
-              isRead: typeof article.is_read === "number" ? article.is_read : 0,
-              isStarred: typeof article.is_starred === "number" ? article.is_starred : 0,
-              createdAt: new Date(normalizeTimestamp(article.created_at)),
-              updatedAt: new Date(serverUpdatedAt),
-              isDeleted: typeof article.is_deleted === "number" ? article.is_deleted : 0,
-              // Extraction fields
-              extractionStatus: article.extraction_status as Article['extractionStatus'],
-              extractionError: article.extraction_error,
-              extractedAt: article.extracted_at ? new Date(normalizeTimestamp(article.extracted_at)) : undefined,
-            });
-            // Invalidate article cache to prevent stale data
-            articleCache.invalidate(article.id);
+          const articlesToUpdate: Article[] = [];
+          const articleIdsToInvalidate: string[] = [];
+
+          for (const article of articles) {
+            const existing = existingArticlesMap.get(article.id);
+            const localUpdatedAt = existing?.updatedAt?.getTime() ?? 0;
+            const serverUpdatedAt = normalizeTimestamp(article.updated_at);
+
+            if (!existing || localUpdatedAt < serverUpdatedAt) {
+              articlesToUpdate.push({
+                ...article,
+                feedId: article.feed_id,
+                publishedAt: article.published_at ? new Date(normalizeTimestamp(article.published_at)) : undefined,
+                isRead: typeof article.is_read === "number" ? article.is_read : 0,
+                isStarred: typeof article.is_starred === "number" ? article.is_starred : 0,
+                createdAt: new Date(normalizeTimestamp(article.created_at)),
+                updatedAt: new Date(serverUpdatedAt),
+                isDeleted: typeof article.is_deleted === "number" ? article.is_deleted : 0,
+                extractionStatus: article.extraction_status as Article['extractionStatus'],
+                extractionError: article.extraction_error,
+                extractedAt: article.extracted_at ? new Date(normalizeTimestamp(article.extracted_at)) : undefined,
+              });
+              articleIdsToInvalidate.push(article.id);
+            }
+          }
+
+          if (articlesToUpdate.length > 0) {
+            await db.articles.bulkPut(articlesToUpdate);
+            // Invalidate article cache for updated articles
+            for (const id of articleIdsToInvalidate) {
+              articleCache.invalidate(id);
+            }
           }
         }
 

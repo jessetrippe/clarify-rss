@@ -7,6 +7,7 @@ import { feedRefreshService } from "@/lib/feed-refresh-service";
 import { setGlobalRefreshState } from "@/hooks/useFeedRefreshState";
 import { syncLogger } from "@/lib/logger";
 import { isNetworkError } from "@/lib/network-utils";
+import { getSyncState } from "@/lib/db-operations";
 
 interface SyncProviderProps {
   children: ReactNode;
@@ -14,6 +15,8 @@ interface SyncProviderProps {
 
 // Minimum time between syncs (5 minutes)
 const MIN_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+// Minimum time before forcing sync on mount (2 minutes)
+const MIN_FORCE_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
 /**
  * SyncProvider handles automatic sync on app lifecycle events
@@ -81,8 +84,20 @@ export default function SyncProvider({ children }: SyncProviderProps) {
       }
     };
 
-    // Initial sync on mount (force to ensure it runs)
-    performFullSync(true);
+    // Initial sync on mount - check if we synced recently before forcing
+    const checkAndSync = async () => {
+      const syncState = await getSyncState();
+      const lastDbSync = syncState?.lastSyncAt?.getTime() || 0;
+      const timeSinceDbSync = Date.now() - lastDbSync;
+
+      // Only force if no sync in the last 2 minutes
+      const shouldForce = timeSinceDbSync >= MIN_FORCE_SYNC_INTERVAL_MS;
+      syncLogger.debug("Initial sync check - lastDbSync:", lastDbSync, "shouldForce:", shouldForce);
+
+      performFullSync(shouldForce);
+    };
+
+    checkAndSync();
 
     // Sync when coming back online (force to get fresh data)
     const handleOnline = () => {

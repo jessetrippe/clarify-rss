@@ -1,22 +1,27 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { Feed } from "@/lib/types";
 import { getFeedIconCandidates } from "@/lib/feed-icon";
-import { getAllFeeds, getUnreadCountsByFeed, getCounts } from "@/lib/db-operations";
+import { getSidebarData, type SidebarData } from "@/lib/db-operations";
 import { StarIcon, Cog6ToothIcon, InboxIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useMobileMenu } from "@/components/MobileMenuProvider";
 
-export default function Sidebar({ className = "" }: { className?: string }) {
+const Sidebar = React.memo(function Sidebar({ className = "" }: { className?: string }) {
   const pathname = usePathname();
   const { isOpen, closeMenu } = useMobileMenu();
-  const feeds = useLiveQuery(async () => getAllFeeds(), []) as Feed[] | undefined;
-  const unreadCounts = useLiveQuery(async () => getUnreadCountsByFeed(), []) as Record<string, number> | undefined;
-  const counts = useLiveQuery(async () => getCounts(), []) as
-    | { unreadCount: number; starredCount: number }
-    | undefined;
+
+  // Single combined query for all sidebar data - much more efficient
+  const sidebarData = useLiveQuery(async () => getSidebarData(), []) as SidebarData | undefined;
+
+  const feeds = sidebarData?.feeds;
+  const unreadCounts = sidebarData?.unreadCountsByFeed;
+  const counts = sidebarData ? {
+    unreadCount: sidebarData.totalUnreadCount,
+    starredCount: sidebarData.starredCount,
+  } : undefined;
 
   const isActive = (href: string) => pathname === href;
   const isFeedActive = (feedId: string) => pathname === `/feeds/${feedId}`;
@@ -180,4 +185,6 @@ export default function Sidebar({ className = "" }: { className?: string }) {
       </div>
     </aside>
   );
-}
+});
+
+export default Sidebar;

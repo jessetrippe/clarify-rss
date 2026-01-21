@@ -56,12 +56,21 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
   const readSessionKey = `clarify-read-session-${variant}-${feedId || "all"}`;
 
   // Session-based read tracking to prevent immediate article removal
-  // Initialize from sessionStorage to persist across route changes
-  const [readInSession, setReadInSession] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
+  // Use a ref to avoid re-renders on every read, with a version counter for controlled updates
+  const readInSessionRef = useRef<Set<string>>(new Set<string>());
+  const isInitializedRef = useRef(false);
+
+  // Initialize from sessionStorage on first render (client-side only)
+  if (!isInitializedRef.current && typeof window !== "undefined") {
     const stored = sessionStorage.getItem(readSessionKey);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  });
+    if (stored) {
+      readInSessionRef.current = new Set(JSON.parse(stored));
+    }
+    isInitializedRef.current = true;
+  }
+
+  // Version counter to trigger re-filtering only when needed
+  const [sessionVersion, setSessionVersion] = useState(0);
 
   const storageKey =
     variant === "feed"
@@ -185,7 +194,9 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
     : (articles ?? cachedData.articles);
 
   // Memoize visible articles calculation to prevent unnecessary filtering
+  // Uses sessionVersion to control when re-filtering happens (not on every ref change)
   const visibleArticles = useMemo(() => {
+    const readInSession = readInSessionRef.current;
     uiLogger.debug('Filtering articles. showRead:', effectiveShowRead, 'readInSession size:', readInSession.size, 'total articles:', resolvedArticles.length);
 
     if (effectiveShowRead) return resolvedArticles;
@@ -197,7 +208,8 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
     uiLogger.debug('Visible articles after filter:', filtered.length);
     return filtered;
-  }, [resolvedArticles, effectiveShowRead, readInSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedArticles, effectiveShowRead, sessionVersion]);
 
   // Detect newly read articles and keep them visible for this session
   const previousReadState = useRef<Map<string, number>>(new Map());
@@ -207,49 +219,40 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
 
     const prevMap = previousReadState.current;
     const nextMap = new Map<string, number>();
+    const readInSession = readInSessionRef.current;
+    let changed = false;
 
-    setReadInSession(prev => {
-      let next = prev;
-      let changed = false;
+    articles.forEach(article => {
+      const prevRead = prevMap.get(article.id);
 
-      articles.forEach(article => {
-        const prevRead = prevMap.get(article.id);
-
-        if (prevRead === 0 && article.isRead === 1 && !prev.has(article.id)) {
-          uiLogger.debug("Article marked as read, keeping visible:", article.id);
-          if (!changed) {
-            next = new Set(prev);
-            changed = true;
-          }
-          next.add(article.id);
-        } else if (prevRead === 1 && article.isRead === 0 && prev.has(article.id)) {
-          if (!changed) {
-            next = new Set(prev);
-            changed = true;
-          }
-          next.delete(article.id);
-        }
-
-        nextMap.set(article.id, article.isRead);
-      });
-
-      previousReadState.current = nextMap;
-
-      if (changed) {
-        sessionStorage.setItem(readSessionKey, JSON.stringify(Array.from(next)));
-        return next;
+      if (prevRead === 0 && article.isRead === 1 && !readInSession.has(article.id)) {
+        uiLogger.debug("Article marked as read, keeping visible:", article.id);
+        readInSession.add(article.id);
+        changed = true;
+      } else if (prevRead === 1 && article.isRead === 0 && readInSession.has(article.id)) {
+        readInSession.delete(article.id);
+        changed = true;
       }
 
-      return prev;
+      nextMap.set(article.id, article.isRead);
     });
+
+    previousReadState.current = nextMap;
+
+    if (changed) {
+      sessionStorage.setItem(readSessionKey, JSON.stringify(Array.from(readInSession)));
+      // Only trigger re-render when the session set actually changed
+      setSessionVersion(v => v + 1);
+    }
   }, [articles, freezeQuery, readSessionKey]);
 
   // Clear session tracking when navigating to different view
   useEffect(() => {
     // Clear sessionStorage for this view
     sessionStorage.removeItem(readSessionKey);
-    setReadInSession(new Set());
+    readInSessionRef.current = new Set();
     previousReadState.current = new Map();
+    setSessionVersion(0);
   }, [variant, feedId, readSessionKey]);
 
   // Track scroll position before updates

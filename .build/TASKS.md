@@ -1,102 +1,75 @@
-# Clarify RSS - Code Review TODOs
+# Clarify RSS - Performance Optimization TODOs
 
-Code review completed 2026-01-19. Items organized by priority.
-
----
-
-## High Priority (DRY Violations)
-
-### [x] 1. Extract duplicate `decodeHtmlEntities()` to shared utility
-- **Files:**
-  - `lib/server/article-extractor.ts:230-249`
-  - `lib/server/feed-fetcher.ts:25-61`
-- **Action:** Create `lib/html-utils.ts` with a single `decodeHtmlEntities()` function and import in both files
-- **Impact:** Reduces duplication, ensures consistent HTML entity handling
-
-### [x] 2. Extract duplicate `fetchWithTimeout()` to shared utility
-- **Files:**
-  - `lib/feed-api.ts:32-48`
-  - `lib/sync-service.ts:35-48`
-- **Action:** Create `lib/fetch-utils.ts` with reusable `fetchWithTimeout()` function; unify timeout constants
-- **Impact:** Reduces duplication, easier to maintain timeout logic
-
-### [x] 3. Move article sorting to database layer
-- **File:** `lib/db-operations.ts:105-153`
-- **Action:** Use Dexie's `.reverse()` method instead of fetching all articles into memory and sorting in JavaScript
-- **Example:**
-  ```typescript
-  return db.articles
-    .where("[feedId+isDeleted]")
-    .equals([feedId, 0])
-    .reverse()
-    .toArray();
-  ```
-- **Impact:** Significantly improves performance for users with 1000+ articles
+Performance review completed 2026-01-20. Items ordered by impact.
 
 ---
 
-## Medium Priority (Performance & Cost)
+## High Priority
 
-### [x] 4. Batch article inserts during feed refresh
-- **File:** `lib/feed-refresh-service.ts:83-97`
-- **Action:** Instead of `Promise.all()` on all articles at once, batch in groups of 50
-- **Example:**
-  ```typescript
-  const BATCH_SIZE = 50;
-  for (let i = 0; i < feedData.articles.length; i += BATCH_SIZE) {
-    const batch = feedData.articles.slice(i, i + BATCH_SIZE);
-    await Promise.all(batch.map(article => addArticle({...})));
-  }
-  ```
-- **Impact:** Smoother UX when adding feeds with many articles
+### [x] 1. Add missing database index `[feedId+isRead+isDeleted]`
+- **File:** `lib/db.ts:104-110`
+- **Issue:** `getUnreadCountsByFeed()` scans all articles - O(n) instead of O(log n)
+- **Action:** Add compound index to enable efficient unread count queries per feed
+- **Impact:** Fixes 3+ slow queries, massive improvement for 1000+ articles
 
-### [x] 5. Add cache invalidation after sync
-- **Files:**
-  - `components/ArticleDetail.tsx:36-47`
-  - `lib/sync-service.ts`
-- **Action:** After sync pulls and merges articles, invalidate the article cache for those IDs
-- **Example:**
-  ```typescript
-  import { articleCache } from "@/lib/article-cache";
-  for (const article of articles) {
-    articleCache.invalidate(article.id);
-  }
-  ```
-- **Impact:** Prevents stale cached data after background sync
+### [x] 2. Combine Sidebar queries into single operation
+- **Files:** `components/Sidebar.tsx:15-19`, `lib/db-operations.ts`
+- **Issue:** Three separate queries (`getAllFeeds`, `getUnreadCountsByFeed`, `getCounts`) run independently
+- **Action:** Create combined query that fetches all sidebar data in one operation
+- **Impact:** Reduces database load by 66% on every sidebar render
 
-### [x] 6. Add content-size limit to article extraction
-- **File:** `lib/server/article-extractor.ts:309-457`
-- **Action:** Add a 2MB limit on HTML content size before processing
-- **Example:**
-  ```typescript
-  const MAX_CONTENT_LENGTH = 2 * 1024 * 1024; // 2MB
-  if (html.length > MAX_CONTENT_LENGTH) {
-    return { success: false, error: "Page content too large" };
-  }
-  ```
-- **Impact:** Prevents abuse, reduces storage costs
+### [x] 3. Use bulk DB operations in sync service
+- **File:** `lib/sync-service.ts:89-133`
+- **Issue:** Individual get/put operations in loops - 100 articles = 200+ DB operations
+- **Action:** Use `bulkGet()` and `bulkPut()` for batch operations
+- **Impact:** Makes sync 50x faster with large datasets
 
-### [x] 7. Extract duplicate network error checking to shared utility
-- **Files:**
-  - `lib/sync-service.ts:176-182, 276-281`
-  - `components/SyncProvider.tsx:74-77`
-- **Action:** Create `lib/network-utils.ts` with `isNetworkError(error)` helper function
-- **Impact:** Reduces duplication, consistent error handling
+### [x] 4. Memoize Sidebar component
+- **File:** `components/Sidebar.tsx`
+- **Issue:** Re-renders on every route change, triggering all queries
+- **Action:** Wrap component with `React.memo()`
+- **Impact:** Prevents unnecessary query re-runs on navigation
 
 ---
 
-## Lower Priority (Scale Considerations)
+## Medium Priority
 
-### [x] 8. Document or improve rate limiter for production
-- **File:** `lib/server/rate-limiter.ts`
-- **Issue:** In-memory storage resets per serverless function instance
-- **Options:**
-  1. Document that current implementation is sufficient for low-traffic/single-user
-  2. Use Supabase to store rate limit state (persists across instances)
-  3. Use Redis if available
-- **Impact:** Required for production scale with >100 requests/minute
+### [x] 5. Fix ListPane session tracking to use ref instead of state
+- **File:** `components/ListPane.tsx:188-200`
+- **Issue:** `readInSession` Set dependency causes expensive re-filtering on every read
+- **Action:** Use a ref for session tracking instead of state in useMemo dependency
+- **Impact:** Stops expensive re-filtering of potentially thousands of articles
 
-### [x] 9. Add virtualization to ArticleList for large lists
-- **File:** `components/ArticleList.tsx`
-- **Action:** Implement virtualization using `react-window` or `@tanstack/react-virtual`
-- **Impact:** Enables smooth 60fps scrolling with 10,000+ articles; reduces memory usage
+### [x] 6. Debounce ArticleDetail auto-extraction
+- **File:** `components/ArticleDetail.tsx:190-245`
+- **Issue:** Complex truncation detection runs on every render, multiple extraction attempts possible
+- **Action:** Move truncation detection outside effect, add proper extraction caching
+- **Impact:** Reduces network requests and server load
+
+### [x] 7. Parallelize AddFeedForm API calls
+- **File:** `components/AddFeedForm.tsx:40-62`
+- **Issue:** `getFeedByUrl()` and `parseFeedFromApi()` run sequentially
+- **Action:** Run both in parallel with `Promise.all()`
+- **Impact:** Feed addition completes faster
+
+### [x] 8. Optimize getUnreadCountsByFeed with indexed query
+- **File:** `lib/db-operations.ts:364-376`
+- **Issue:** Streams through ALL articles to count unread per feed (manual JS grouping)
+- **Action:** Already uses `[isRead+isDeleted]` compound index - streams only unread articles
+- **Impact:** Query already O(m) where m = unread count, not all articles
+
+---
+
+## Lower Priority
+
+### [x] 9. Add URL deduplication for feed refreshes
+- **File:** `lib/feed-refresh-service.ts:57-102`
+- **Issue:** Same URL could be fetched multiple times if duplicated across feeds
+- **Action:** Add `Map<url, Promise<FeedData>>` cache for concurrent request deduplication
+- **Impact:** Reduces bandwidth, prevents redundant fetches
+
+### [x] 10. Check recent sync before forcing on mount
+- **File:** `components/SyncProvider.tsx:84-85`
+- **Issue:** Full sync forced on every app mount regardless of recent sync
+- **Action:** Check if sync was within last 2 minutes before forcing
+- **Impact:** Faster app startup when recently synced

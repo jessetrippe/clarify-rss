@@ -108,6 +108,14 @@ export class ClarifyDB extends Dexie {
         "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, extractionStatus, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted]",
       syncState: "id",
     }).upgrade(normalizeDatabaseData);
+
+    // Version 5: Add compound index for efficient unread count queries by feed
+    this.version(5).stores({
+      feeds: "id, url, isDeleted, updatedAt",
+      articles:
+        "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, extractionStatus, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted], [feedId+isRead+isDeleted]",
+      syncState: "id",
+    });
   }
 }
 

@@ -1,8 +1,11 @@
 import { getAllFeeds, addArticle, updateFeed } from "./db-operations";
-import { parseFeedFromApi } from "./feed-api";
+import { parseFeedFromApi, type FeedData } from "./feed-api";
 import type { Feed } from "./types";
 import { feedLogger } from "./logger";
 import { withRetry, isTransientError } from "./retry";
+
+// Cache for in-flight feed requests to deduplicate concurrent fetches
+type FeedDataPromise = Promise<FeedData>;
 
 // Minimum time between feed refreshes (5 minutes)
 const MIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -54,6 +57,9 @@ export class FeedRefreshService {
         errors: [],
       });
 
+      // URL deduplication cache - prevents fetching same URL multiple times
+      const urlCache = new Map<string, FeedDataPromise>();
+
       // Fetch all feeds in parallel (with Promise.allSettled to handle failures)
       const results = await Promise.allSettled(
         feeds.map(async (feed) => {
@@ -69,15 +75,22 @@ export class FeedRefreshService {
               }
             }
 
-            // Fetch and parse feed with retry for transient errors
-            const feedData = await withRetry(
-              () => parseFeedFromApi(feed.url),
-              {
-                maxRetries: 2,
-                initialDelayMs: 1000,
-                shouldRetry: isTransientError,
-              }
-            );
+            // Check if we already have an in-flight request for this URL
+            let feedDataPromise = urlCache.get(feed.url);
+            if (!feedDataPromise) {
+              // Create new request with retry for transient errors
+              feedDataPromise = withRetry(
+                () => parseFeedFromApi(feed.url),
+                {
+                  maxRetries: 2,
+                  initialDelayMs: 1000,
+                  shouldRetry: isTransientError,
+                }
+              );
+              urlCache.set(feed.url, feedDataPromise);
+            }
+
+            const feedData = await feedDataPromise;
 
             // Add articles in batches to prevent too many concurrent IndexedDB operations
             // (addArticle handles duplicates via stable ID generation)

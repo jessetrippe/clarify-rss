@@ -28,9 +28,15 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
     setDiscoveredFeeds([]);
 
     try {
-      // Check if feed already exists
-      const existingFeed = await getFeedByUrl(url);
-      if (existingFeed && existingFeed.isDeleted === 0) {
+      // Run both checks in parallel for better performance
+      const [existingFeed, feedDataResult] = await Promise.allSettled([
+        getFeedByUrl(url),
+        parseFeedFromApi(url),
+      ]);
+
+      // Check if feed already exists (only if active)
+      const existing = existingFeed.status === 'fulfilled' ? existingFeed.value : undefined;
+      if (existing && existing.isDeleted === 0) {
         setError("This feed already exists");
         setIsLoading(false);
         return;
@@ -38,16 +44,19 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
 
       // Try to parse as feed
       try {
-        const feedData = await parseFeedFromApi(url);
+        if (feedDataResult.status === 'rejected') {
+          throw feedDataResult.reason;
+        }
+        const feedData = feedDataResult.value;
 
         // Add feed to database
-        const feed = existingFeed
-          ? await updateFeed(existingFeed.id, {
+        const feed = existing
+          ? await updateFeed(existing.id, {
               title: feedData.title,
               iconUrl: feedData.iconUrl,
               isDeleted: 0,
             }).then(() => ({
-              ...existingFeed,
+              ...existing,
               title: feedData.title,
               iconUrl: feedData.iconUrl,
               isDeleted: 0,
@@ -58,7 +67,7 @@ export default function AddFeedForm({ onSuccess }: AddFeedFormProps) {
               iconUrl: feedData.iconUrl,
             });
 
-        if (existingFeed?.isDeleted === 1) {
+        if (existing?.isDeleted === 1) {
           await restoreFeedArticles(feed.id);
         }
 
