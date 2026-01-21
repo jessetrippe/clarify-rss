@@ -96,7 +96,7 @@ Code review completed 2026-01-19. Items organized by priority.
   3. Use Redis if available
 - **Impact:** Required for production scale with >100 requests/minute
 
-### [ ] 9. Add virtualization to ArticleList for large lists
+### [x] 9. Add virtualization to ArticleList for large lists
 - **File:** `components/ArticleList.tsx`
 - **Action:** Implement virtualization using `react-window` or `@tanstack/react-virtual`
 - **Impact:** Enables smooth 60fps scrolling with 10,000+ articles; reduces memory usage

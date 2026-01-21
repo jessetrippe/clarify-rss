@@ -1,10 +1,11 @@
-// ArticleList component - displays a list of articles
+// ArticleList component - displays a virtualized list of articles for performance
 
-import React from "react";
+import React, { useRef } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { StarIcon } from "@heroicons/react/24/solid";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Article } from "@/lib/types";
 import { primeArticleCache } from "@/lib/article-cache";
 
@@ -97,6 +98,12 @@ const ArticleItem = React.memo(function ArticleItem({
   );
 });
 
+// Threshold for enabling virtualization (don't virtualize small lists)
+const VIRTUALIZATION_THRESHOLD = 100;
+
+// Estimated row heights for virtualization
+const ESTIMATED_ROW_HEIGHT = 85; // px - average height of an article row
+
 const ArticleList = React.memo(function ArticleList({
   articles,
   showFeedName = false,
@@ -107,6 +114,18 @@ const ArticleList = React.memo(function ArticleList({
   const searchParams = useSearchParams();
   const sourcePath = fromPath || pathname;
   const selectedId = searchParams.get("article");
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Use virtualization for large lists
+  const shouldVirtualize = articles.length > VIRTUALIZATION_THRESHOLD;
+
+  const virtualizer = useVirtualizer({
+    count: articles.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 5, // Render 5 extra items above/below viewport
+    enabled: shouldVirtualize,
+  });
 
   if (articles.length === 0) {
     return (
@@ -117,19 +136,66 @@ const ArticleList = React.memo(function ArticleList({
     );
   }
 
+  // For small lists, render without virtualization
+  if (!shouldVirtualize) {
+    return (
+      <>
+        {articles.map((article) => (
+          <ArticleItem
+            key={article.id}
+            article={article}
+            showFeedName={showFeedName}
+            feedName={feedNames[article.feedId]}
+            sourcePath={sourcePath}
+            isSelected={selectedId === article.id}
+          />
+        ))}
+      </>
+    );
+  }
+
+  // Virtualized rendering for large lists
+  const virtualItems = virtualizer.getVirtualItems();
+
   return (
-    <>
-      {articles.map((article) => (
-        <ArticleItem
-          key={article.id}
-          article={article}
-          showFeedName={showFeedName}
-          feedName={feedNames[article.feedId]}
-          sourcePath={sourcePath}
-          isSelected={selectedId === article.id}
-        />
-      ))}
-    </>
+    <div
+      ref={parentRef}
+      className="h-full overflow-auto"
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: "100%",
+          position: "relative",
+        }}
+      >
+        {virtualItems.map((virtualItem) => {
+          const article = articles[virtualItem.index];
+          return (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <ArticleItem
+                article={article}
+                showFeedName={showFeedName}
+                feedName={feedNames[article.feedId]}
+                sourcePath={sourcePath}
+                isSelected={selectedId === article.id}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison: only re-render if the filtered articles actually changed
