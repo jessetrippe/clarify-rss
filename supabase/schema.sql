@@ -5,6 +5,7 @@ create table if not exists feeds (
   user_id uuid not null references auth.users(id) on delete cascade,
   url text not null,
   title text not null,
+  enable_extraction integer not null default 0,
   last_fetched_at bigint,
   last_error text,
   created_at bigint not null,

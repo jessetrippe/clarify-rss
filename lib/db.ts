@@ -8,6 +8,7 @@ interface RawFeedData {
   isDeleted?: boolean | number;
   createdAt?: Date | string | number;
   updatedAt?: Date | string | number;
+  enableExtraction?: boolean | number;
 }
 
 // Type for raw article data during migrations (before normalization)
@@ -30,6 +31,10 @@ function normalizeDatabaseData(tx: Transaction) {
     tx.table("feeds").toCollection().modify((feed: RawFeedData) => {
       if (typeof feed.isDeleted === "boolean") feed.isDeleted = feed.isDeleted ? 1 : 0;
       if (typeof feed.isDeleted !== "number") feed.isDeleted = 0;
+      if (typeof feed.enableExtraction === "boolean") {
+        feed.enableExtraction = feed.enableExtraction ? 1 : 0;
+      }
+      if (typeof feed.enableExtraction !== "number") feed.enableExtraction = 0;
       if (feed.createdAt && !(feed.createdAt instanceof Date)) {
         feed.createdAt = new Date(feed.createdAt);
       }
@@ -116,6 +121,14 @@ export class ClarifyDB extends Dexie {
         "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, extractionStatus, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted], [feedId+isRead+isDeleted]",
       syncState: "id",
     });
+
+    // Version 6: Add feed-level extraction toggle
+    this.version(6).stores({
+      feeds: "id, url, isDeleted, updatedAt",
+      articles:
+        "id, feedId, isRead, isStarred, publishedAt, isDeleted, updatedAt, extractionStatus, [feedId+isDeleted], [isStarred+isDeleted], [isRead+isDeleted], [feedId+isRead+isDeleted]",
+      syncState: "id",
+    }).upgrade(normalizeDatabaseData);
   }
 }
 

@@ -33,6 +33,7 @@ export interface FeedRow {
   user_id?: string;
   url: string;
   title: string;
+  enable_extraction?: number | null;
   last_fetched_at?: number | null;
   last_error?: string | null;
   created_at: number;

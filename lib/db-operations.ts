@@ -43,6 +43,7 @@ export async function addFeed(params: {
     url: params.url,
     title: params.title,
     iconUrl: params.iconUrl,
+    enableExtraction: 0,
     createdAt: now,
     updatedAt: now,
     isDeleted: 0,

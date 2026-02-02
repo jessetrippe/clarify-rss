@@ -230,10 +230,11 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
     return (
       needsExtraction &&
       !!article.url &&
+      feed?.enableExtraction === 1 &&
       article.extractionStatus !== 'completed' &&
       article.extractionStatus !== 'failed'
     );
-  }, [article?.id, article?.content, article?.summary, article?.url, article?.extractionStatus]);
+  }, [article?.id, article?.content, article?.summary, article?.url, article?.extractionStatus, feed?.enableExtraction]);
 
   // Auto-trigger extraction when article loads
   useEffect(() => {

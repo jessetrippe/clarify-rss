@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   getAllArticles,
   getAllFeeds,
   getStarredArticles,
   getArticlesByFeed,
+  markArticleRead,
 } from "@/lib/db-operations";
 import type { Article, Feed } from "@/lib/types";
 import ArticleList from "@/components/ArticleList";
@@ -211,6 +212,11 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedArticles, effectiveShowRead, sessionVersion]);
 
+  // Handle swipe-to-mark-as-read from ArticleList
+  const handleMarkRead = useCallback((articleId: string) => {
+    markArticleRead(articleId);
+  }, []);
+
   // Detect newly read articles and keep them visible for this session
   const previousReadState = useRef<Map<string, number>>(new Map());
 
@@ -342,6 +348,7 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
           showFeedName={variant !== "feed"}
           feedNames={feedNames}
           fromPath={listPath}
+          onMarkRead={handleMarkRead}
         />
       )}
 

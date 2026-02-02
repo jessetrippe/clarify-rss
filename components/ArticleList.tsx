@@ -1,6 +1,6 @@
 // ArticleList component - displays a virtualized list of articles for performance
 
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
@@ -8,12 +8,14 @@ import { StarIcon } from "@heroicons/react/24/solid";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Article } from "@/lib/types";
 import { primeArticleCache } from "@/lib/article-cache";
+import SwipeableArticleItem from "@/components/SwipeableArticleItem";
 
 interface ArticleListProps {
   articles: Article[];
   showFeedName?: boolean;
   feedNames?: Record<string, string>; // feedId -> feedName mapping
   fromPath?: string;
+  onMarkRead?: (articleId: string) => void;
 }
 
 interface ArticleItemProps {
@@ -109,12 +111,22 @@ const ArticleList = React.memo(function ArticleList({
   showFeedName = false,
   feedNames = {},
   fromPath,
+  onMarkRead,
 }: ArticleListProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const sourcePath = fromPath || pathname;
   const selectedId = searchParams.get("article");
   const parentRef = useRef<HTMLDivElement>(null);
+
+  // Detect touch device capability
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => {
+    // Check for touch capability after hydration
+    setIsTouchDevice(
+      "ontouchstart" in window || navigator.maxTouchPoints > 0
+    );
+  }, []);
 
   // Use virtualization for large lists
   const shouldVirtualize = articles.length > VIRTUALIZATION_THRESHOLD;
@@ -136,20 +148,39 @@ const ArticleList = React.memo(function ArticleList({
     );
   }
 
+  // Helper to render an article item with optional swipe wrapper
+  const renderArticleItem = (article: Article) => {
+    const item = (
+      <ArticleItem
+        article={article}
+        showFeedName={showFeedName}
+        feedName={feedNames[article.feedId]}
+        sourcePath={sourcePath}
+        isSelected={selectedId === article.id}
+      />
+    );
+
+    // Wrap with swipe gesture on touch devices when callback is provided
+    if (isTouchDevice && onMarkRead) {
+      return (
+        <SwipeableArticleItem
+          key={article.id}
+          onMarkRead={() => onMarkRead(article.id)}
+          enabled={article.isRead === 0} // Only enable swipe for unread articles
+        >
+          {item}
+        </SwipeableArticleItem>
+      );
+    }
+
+    return <React.Fragment key={article.id}>{item}</React.Fragment>;
+  };
+
   // For small lists, render without virtualization
   if (!shouldVirtualize) {
     return (
       <>
-        {articles.map((article) => (
-          <ArticleItem
-            key={article.id}
-            article={article}
-            showFeedName={showFeedName}
-            feedName={feedNames[article.feedId]}
-            sourcePath={sourcePath}
-            isSelected={selectedId === article.id}
-          />
-        ))}
+        {articles.map((article) => renderArticleItem(article))}
       </>
     );
   }
@@ -171,6 +202,15 @@ const ArticleList = React.memo(function ArticleList({
       >
         {virtualItems.map((virtualItem) => {
           const article = articles[virtualItem.index];
+          const articleContent = (
+            <ArticleItem
+              article={article}
+              showFeedName={showFeedName}
+              feedName={feedNames[article.feedId]}
+              sourcePath={sourcePath}
+              isSelected={selectedId === article.id}
+            />
+          );
           return (
             <div
               key={virtualItem.key}
@@ -184,13 +224,16 @@ const ArticleList = React.memo(function ArticleList({
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              <ArticleItem
-                article={article}
-                showFeedName={showFeedName}
-                feedName={feedNames[article.feedId]}
-                sourcePath={sourcePath}
-                isSelected={selectedId === article.id}
-              />
+              {isTouchDevice && onMarkRead ? (
+                <SwipeableArticleItem
+                  onMarkRead={() => onMarkRead(article.id)}
+                  enabled={article.isRead === 0}
+                >
+                  {articleContent}
+                </SwipeableArticleItem>
+              ) : (
+                articleContent
+              )}
             </div>
           );
         })}
@@ -202,6 +245,7 @@ const ArticleList = React.memo(function ArticleList({
   if (prevProps.articles.length !== nextProps.articles.length) return false;
   if (prevProps.showFeedName !== nextProps.showFeedName) return false;
   if (prevProps.fromPath !== nextProps.fromPath) return false;
+  if (prevProps.onMarkRead !== nextProps.onMarkRead) return false;
 
   // Check if article IDs or read states changed
   for (let i = 0; i < prevProps.articles.length; i++) {

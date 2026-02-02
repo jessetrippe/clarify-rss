@@ -6,6 +6,7 @@ export interface Feed {
   url: string;
   title: string;
   iconUrl?: string;
+  enableExtraction?: number;
   lastFetchedAt?: Date;
   lastError?: string;
   createdAt: Date;

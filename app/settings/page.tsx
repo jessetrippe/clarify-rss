@@ -92,6 +92,31 @@ export default function Settings() {
     setRenameDialog({ isOpen: true, feedId: id, currentTitle });
   };
 
+  const handleToggleExtraction = async (feed: Feed, enabled: boolean) => {
+    const nextValue = enabled ? 1 : 0;
+    setFeeds((prev) =>
+      prev.map((item) =>
+        item.id === feed.id ? { ...item, enableExtraction: nextValue } : item
+      )
+    );
+
+    try {
+      await updateFeed(feed.id, { enableExtraction: nextValue });
+    } catch (error) {
+      uiLogger.error("Error updating extraction setting:", error);
+      setFeeds((prev) =>
+        prev.map((item) =>
+          item.id === feed.id ? { ...item, enableExtraction: feed.enableExtraction ?? 0 } : item
+        )
+      );
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to update extraction setting. Please try again.",
+      });
+    }
+  };
+
   const confirmRenameFeed = async (newTitle: string) => {
     if (newTitle === renameDialog.currentTitle) {
       setRenameDialog({ isOpen: false, feedId: "", currentTitle: "" });
@@ -208,6 +233,17 @@ export default function Settings() {
                           </>
                         )}
                       </div>
+                      <label className="mt-3 inline-flex items-center gap-2 text-xs text-[var(--muted)]">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-[var(--border)] text-[var(--foreground)]"
+                          checked={feed.enableExtraction === 1}
+                          onChange={(event) =>
+                            handleToggleExtraction(feed, event.target.checked)
+                          }
+                        />
+                        Enable full-article extraction
+                      </label>
                       {feed.lastError && (
                         <div className="text-xs text-red-600 dark:text-red-400 mt-2">
                           Error: {feed.lastError}

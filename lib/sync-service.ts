@@ -104,6 +104,8 @@ export class SyncService {
               feedsToUpdate.push({
                 ...feed,
                 iconUrl: existing?.iconUrl,
+                enableExtraction:
+                  typeof feed.enable_extraction === "number" ? feed.enable_extraction : 0,
                 lastFetchedAt: feed.last_fetched_at ? new Date(normalizeTimestamp(feed.last_fetched_at)) : undefined,
                 createdAt: new Date(normalizeTimestamp(feed.created_at)),
                 updatedAt: new Date(serverUpdatedAt),
@@ -228,6 +230,7 @@ export class SyncService {
         id: f.id,
         url: f.url,
         title: f.title,
+        enable_extraction: f.enableExtraction ?? 0,
         last_fetched_at: f.lastFetchedAt?.getTime(),
         last_error: f.lastError,
         created_at: f.createdAt.getTime(),
