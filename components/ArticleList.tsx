@@ -15,7 +15,7 @@ interface ArticleListProps {
   showFeedName?: boolean;
   feedNames?: Record<string, string>; // feedId -> feedName mapping
   fromPath?: string;
-  onMarkRead?: (articleId: string) => void;
+  onToggleRead?: (articleId: string) => void;
 }
 
 interface ArticleItemProps {
@@ -111,7 +111,7 @@ const ArticleList = React.memo(function ArticleList({
   showFeedName = false,
   feedNames = {},
   fromPath,
-  onMarkRead,
+  onToggleRead,
 }: ArticleListProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -161,12 +161,13 @@ const ArticleList = React.memo(function ArticleList({
     );
 
     // Wrap with swipe gesture on touch devices when callback is provided
-    if (isTouchDevice && onMarkRead) {
+    if (isTouchDevice && onToggleRead) {
       return (
         <SwipeableArticleItem
           key={article.id}
-          onMarkRead={() => onMarkRead(article.id)}
-          enabled={article.isRead === 0} // Only enable swipe for unread articles
+          onToggleRead={() => onToggleRead(article.id)}
+          isRead={article.isRead === 1}
+          enabled
         >
           {item}
         </SwipeableArticleItem>
@@ -224,10 +225,11 @@ const ArticleList = React.memo(function ArticleList({
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              {isTouchDevice && onMarkRead ? (
+              {isTouchDevice && onToggleRead ? (
                 <SwipeableArticleItem
-                  onMarkRead={() => onMarkRead(article.id)}
-                  enabled={article.isRead === 0}
+                  onToggleRead={() => onToggleRead(article.id)}
+                  isRead={article.isRead === 1}
+                  enabled
                 >
                   {articleContent}
                 </SwipeableArticleItem>
@@ -245,7 +247,7 @@ const ArticleList = React.memo(function ArticleList({
   if (prevProps.articles.length !== nextProps.articles.length) return false;
   if (prevProps.showFeedName !== nextProps.showFeedName) return false;
   if (prevProps.fromPath !== nextProps.fromPath) return false;
-  if (prevProps.onMarkRead !== nextProps.onMarkRead) return false;
+  if (prevProps.onToggleRead !== nextProps.onToggleRead) return false;
 
   // Check if article IDs or read states changed
   for (let i = 0; i < prevProps.articles.length; i++) {

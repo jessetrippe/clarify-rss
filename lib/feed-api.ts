@@ -104,7 +104,8 @@ export interface ExtractArticleResult {
  */
 export async function extractArticleContent(
   articleId: string,
-  url: string
+  url: string,
+  feedId?: string
 ): Promise<ExtractArticleResult> {
   const accessToken = await getAccessToken();
   const response = await fetchWithTimeout(`${API_URL}/api/articles/extract`, {
@@ -113,7 +114,7 @@ export async function extractArticleContent(
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify({ articleId, url }),
+    body: JSON.stringify({ articleId, url, feedId }),
   });
 
   if (!response.ok) {

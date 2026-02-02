@@ -5,6 +5,7 @@ import { applyRateLimit } from "@/lib/server/rate-limit";
 import { extractArticleContent } from "@/lib/server/article-extractor";
 import { validateUrl } from "@/lib/validation";
 import { handlePreflight } from "@/lib/server/cors";
+import { getExtractionProfileConfig } from "@/lib/server/extraction-profiles";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ export async function POST(request: Request): Promise<Response> {
     return rateLimitResponse;
   }
 
-  const body = await parseJsonBody<{ articleId: string; url: string }>(request);
+  const body = await parseJsonBody<{ articleId: string; url: string; feedId?: string }>(request);
   if (!body) {
     return jsonError(request, "Invalid JSON body", 400);
   }
@@ -36,7 +37,8 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const validatedUrl = validateUrl(body.url);
-    const result = await extractArticleContent(validatedUrl);
+    const profile = getExtractionProfileConfig(new URL(validatedUrl), body.feedId);
+    const result = await extractArticleContent(validatedUrl, profile);
     return jsonResponse(request, {
       success: result.success,
       content: result.content,

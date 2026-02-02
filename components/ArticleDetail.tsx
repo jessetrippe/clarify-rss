@@ -175,7 +175,7 @@ export default function ArticleDetail({ articleId, onBack }: ArticleDetailProps)
       // Update status to extracting
       await updateArticleExtractionStatus(article.id, 'extracting');
 
-      const result = await extractArticleContent(article.id, article.url);
+      const result = await extractArticleContent(article.id, article.url, feed?.id);
 
       if (result.success && result.content) {
         // Update database with extracted content

@@ -10,6 +10,18 @@ export interface ExtractionResult {
   error?: string;
 }
 
+export interface ExtractionProfileConfig {
+  preferJsonLd?: boolean;
+  selectors?: {
+    content?: string | string[];
+    title?: string | string[];
+  };
+  removals?: string | string[];
+  postprocess?: {
+    stripSelectors?: string | string[];
+  };
+}
+
 const MIN_CONTENT_LENGTH = 100;
 const PREFERRED_CONTENT_LENGTH = 800;
 
@@ -31,6 +43,40 @@ function textToParagraphs(text: string): string {
     .map((part) => part.trim())
     .filter(Boolean);
   return parts.map((part) => `<p>${escapeHtml(part)}</p>`).join("");
+}
+
+function parseImageToken(token: string): { src?: string; caption?: string } {
+  const withoutBrackets = token.replace(/^\[|\]$/g, "").trim();
+  const withoutPrefix = withoutBrackets.replace(/^Image:\s*/i, "").trim();
+  const urls = withoutPrefix.match(/https?:\/\/\S+/g) || [];
+  const src = urls.length ? urls[urls.length - 1] : undefined;
+  const caption = src
+    ? withoutPrefix.replace(src, "").trim().replace(/\s+/g, " ")
+    : undefined;
+  return { src, caption };
+}
+
+function textToParagraphsWithImages(text: string): string {
+  const tokenized = text.replace(/\[Image:[^\]]+\]/g, (match) => `\n\n${match}\n\n`);
+  const parts = tokenized
+    .split(/\n{2,}|\r\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts
+    .map((part) => {
+      if (/^\[Image:[^\]]+\]$/i.test(part)) {
+        const { src, caption } = parseImageToken(part);
+        if (!src) return "";
+        if (caption) {
+          return `<figure><img src="${escapeHtml(src)}" alt="${escapeHtml(caption)}" /><figcaption>${escapeHtml(caption)}</figcaption></figure>`;
+        }
+        return `<img src="${escapeHtml(src)}" alt="Image" />`;
+      }
+      return `<p>${escapeHtml(part)}</p>`;
+    })
+    .filter(Boolean)
+    .join("");
 }
 
 function isLikelyContentText(text: string): boolean {
@@ -188,7 +234,12 @@ function extractFromJsonLd(document: Document): ExtractedContent {
   }
 
   if (!bestBody) return {};
-  return { content: textToParagraphs(bestBody), title: bestTitle };
+
+  const normalizedBody = decodeHtmlEntities(bestBody)
+    .replace(/\r\n/g, "\n")
+    .replace(/\n+/g, "\n\n");
+
+  return { content: textToParagraphsWithImages(normalizedBody), title: bestTitle };
 }
 
 function extractFromArticleElement(document: Document): ExtractedContent {
@@ -263,6 +314,63 @@ function extractParagraphsWithRegex(html: string): string[] {
   return paragraphs;
 }
 
+function normalizeSelectorList(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    return [value.trim()];
+  }
+  return [];
+}
+
+function htmlFromElement(element: Element): string {
+  const html = element.innerHTML?.trim() ?? "";
+  if (!html) return "";
+  if (html.includes("<")) return html;
+  return textToParagraphs(html);
+}
+
+function extractWithProfile(document: Document, profile?: ExtractionProfileConfig): ExtractedContent {
+  if (!profile) return {};
+
+  const removals = [
+    ...normalizeSelectorList(profile.removals),
+    ...normalizeSelectorList(profile.postprocess?.stripSelectors),
+  ];
+
+  for (const selector of removals) {
+    document.querySelectorAll(selector).forEach((node) => node.remove());
+  }
+
+  const contentSelectors = normalizeSelectorList(profile.selectors?.content);
+  const titleSelectors = normalizeSelectorList(profile.selectors?.title);
+
+  let bestContent: string | undefined;
+  for (const selector of contentSelectors) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+    const html = htmlFromElement(element);
+    if (!html) continue;
+    if (!bestContent || getTextLength(html) > getTextLength(bestContent)) {
+      bestContent = html;
+    }
+  }
+
+  let title: string | undefined;
+  for (const selector of titleSelectors) {
+    const element = document.querySelector(selector);
+    const text = element?.textContent?.trim();
+    if (text) {
+      title = text;
+      break;
+    }
+  }
+
+  return { content: bestContent, title };
+}
+
 async function fetchWithBrowserHeaders(url: string): Promise<Response> {
   const response = await fetch(url, {
     headers: {
@@ -282,7 +390,8 @@ async function fetchWithBrowserHeaders(url: string): Promise<Response> {
 }
 
 export async function extractArticleContent(
-  url: string
+  url: string,
+  profile?: ExtractionProfileConfig
 ): Promise<ExtractionResult> {
   try {
     const parsedUrl = new URL(url);
@@ -324,6 +433,42 @@ export async function extractArticleContent(
 
     // DOM-based extraction methods (only if parseHTML succeeded)
     if (document) {
+      if (profile?.preferJsonLd) {
+        try {
+          const jsonLdResult = extractFromJsonLd(document);
+          if (jsonLdResult.content && getTextLength(jsonLdResult.content) >= MIN_CONTENT_LENGTH) {
+            return {
+              success: true,
+              content: jsonLdResult.content,
+              title: jsonLdResult.title,
+            };
+          }
+          if (jsonLdResult.content) {
+            candidates.push(jsonLdResult);
+          }
+        } catch {
+          // JSON-LD extraction failed
+        }
+      }
+
+      if (profile) {
+        try {
+          const profileResult = extractWithProfile(document, profile);
+          if (profileResult.content && getTextLength(profileResult.content) >= MIN_CONTENT_LENGTH) {
+            return {
+              success: true,
+              content: profileResult.content,
+              title: profileResult.title,
+            };
+          }
+          if (profileResult.content) {
+            candidates.push(profileResult);
+          }
+        } catch {
+          // Profile extraction failed
+        }
+      }
+
       // Readability can fail on some pages (e.g., canvas-related errors with images)
       try {
         const reader = new Readability(document, {

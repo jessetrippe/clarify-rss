@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Bars3Icon } from "@heroicons/react/24/outline";
+import { useMobileMenu } from "@/components/MobileMenuProvider";
 import { getAllFeeds, deleteFeed, updateFeed, getArticleCountsByFeed } from "@/lib/db-operations";
 import type { Feed } from "@/lib/types";
 import AddFeedForm from "@/components/AddFeedForm";
@@ -18,6 +20,7 @@ export default function Settings() {
   const [feedCounts, setFeedCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const { openMenu } = useMobileMenu();
 
   // Modal states
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; feedId: string; feedTitle: string }>({
@@ -162,45 +165,70 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          {userEmail && (
-            <p className="text-sm text-[var(--muted)] mt-1">
-              Signed in as {userEmail}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {feeds.length > 0 && (
+      <div className="sticky top-0 z-10 bg-[var(--background)] -mx-4 px-4 py-3 border-b border-[var(--border)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
             <button
-              onClick={handleExportOPML}
-              className="px-3 py-1.5 text-sm border border-[var(--border)] text-[var(--foreground)] rounded hover:bg-[var(--border)] transition-colors"
+              type="button"
+              onClick={openMenu}
+              className="xl:hidden p-1.5 rounded hover:bg-[var(--border)] text-[var(--muted)] transition-colors"
+              aria-label="Open menu"
             >
-              Export OPML
+              <Bars3Icon className="h-5 w-5" aria-hidden="true" />
             </button>
-          )}
-          <button
-            onClick={handleSignOut}
-            className="px-3 py-1.5 text-sm border border-[var(--border)] text-[var(--muted)] rounded hover:bg-[var(--border)] hover:text-[var(--foreground)] transition-colors"
-          >
-            Sign out
-          </button>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-8 pt-8">
+        <section className="border border-[var(--border)] rounded-lg p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--muted)]">
+                Account
+              </h2>
+              {userEmail && (
+                <p className="text-sm text-[var(--foreground)] mt-1">
+                  Signed in as {userEmail}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="px-3 py-1.5 text-sm border border-[var(--border)] text-[var(--muted)] rounded hover:bg-[var(--border)] hover:text-[var(--foreground)] transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        </section>
         {/* Add Feed Form */}
-        <AddFeedForm onSuccess={loadFeeds} />
+        <section className="border border-[var(--border)] rounded-lg p-4">
+          <AddFeedForm onSuccess={loadFeeds} />
+        </section>
 
         {/* OPML Import */}
-        <OPMLImport onSuccess={loadFeeds} />
+        <section className="border border-[var(--border)] rounded-lg p-4">
+          <OPMLImport onSuccess={loadFeeds} />
+        </section>
 
         {/* Feed List */}
-        <div>
-          <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--muted)] mb-4">
-            Your Feeds {feeds.length > 0 && `(${feeds.length})`}
-          </h2>
+        <section className="border border-[var(--border)] rounded-lg p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--muted)]">
+              Your Feeds {feeds.length > 0 && `(${feeds.length})`}
+            </h2>
+            {feeds.length > 0 && (
+              <button
+                onClick={handleExportOPML}
+                className="px-3 py-1.5 text-sm border border-[var(--border)] text-[var(--foreground)] rounded hover:bg-[var(--border)] transition-colors"
+              >
+                Export OPML
+              </button>
+            )}
+          </div>
 
           {feeds.length === 0 ? (
             <div className={`${emptyStateClass} flex flex-col items-center`}>
@@ -269,7 +297,7 @@ export default function Settings() {
               ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
 
       {/* Modals */}

@@ -1,0 +1,27 @@
+{
+  "profiles": [
+    {
+      "id": "theverge-jsonld",
+      "name": "The Verge (JSON-LD)",
+      "match": { "type": "domain", "value": "theverge.com" },
+      "priority": 10,
+      "preferJsonLd": true
+    },
+    {
+      "id": "westseattleblog",
+      "name": "West Seattle Blog",
+      "match": { "type": "domain", "value": "westseattleblog.com" },
+      "priority": 10,
+      "selectors": {
+        "content": ".single-content",
+        "title": "h1.title"
+      },
+      "removals": [
+        ".addtoany_share_save_container",
+        ".comments-container",
+        "#respond"
+      ]
+    }
+  ],
+  "overrides": []
+}

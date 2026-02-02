@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { CheckIcon } from "@heroicons/react/24/solid";
+import React, { useEffect, useRef, useState } from "react";
+import { CheckIcon, ArrowUturnLeftIcon } from "@heroicons/react/24/solid";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 
 interface SwipeableArticleItemProps {
   children: React.ReactNode;
-  onMarkRead: () => void;
+  onToggleRead: () => void;
+  isRead: boolean;
   enabled?: boolean;
 }
 
@@ -15,10 +16,12 @@ const ICON_SHOW_THRESHOLD = 40; // Show checkmark at 50% of threshold
 
 export function SwipeableArticleItem({
   children,
-  onMarkRead,
+  onToggleRead,
+  isRead,
   enabled = true,
 }: SwipeableArticleItemProps) {
-  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const completeTimerRef = useRef<number | null>(null);
 
   const {
     isSwiping,
@@ -30,23 +33,31 @@ export function SwipeableArticleItem({
   } = useSwipeGesture({
     threshold: SWIPE_THRESHOLD,
     onSwipeComplete: () => {
-      setIsAnimatingOut(true);
+      setIsCompleting(true);
     },
     enabled,
   });
 
-  // Handle animation completion
+  // Handle completion + reset
   useEffect(() => {
-    if (isAnimatingOut) {
-      const timer = setTimeout(() => {
-        onMarkRead();
-      }, 200); // Match CSS transition duration
-      return () => clearTimeout(timer);
-    }
-  }, [isAnimatingOut, onMarkRead]);
+    if (!isCompleting) return;
+    completeTimerRef.current = window.setTimeout(() => {
+      onToggleRead();
+      setIsCompleting(false);
+    }, 200); // Match CSS transition duration
 
-  const showCheckmark = swipeOffset >= ICON_SHOW_THRESHOLD || isAnimatingOut;
-  const checkmarkOpacity = Math.min(1, (swipeOffset - ICON_SHOW_THRESHOLD / 2) / ICON_SHOW_THRESHOLD);
+    return () => {
+      if (completeTimerRef.current !== null) {
+        window.clearTimeout(completeTimerRef.current);
+        completeTimerRef.current = null;
+      }
+    };
+  }, [isCompleting, onToggleRead]);
+
+  const isMarkUnread = isRead;
+  const showIcon = swipeOffset >= ICON_SHOW_THRESHOLD || isCompleting;
+  const iconOpacity = Math.min(1, (swipeOffset - ICON_SHOW_THRESHOLD / 2) / ICON_SHOW_THRESHOLD);
+  const backgroundClass = isMarkUnread ? "bg-amber-500" : "bg-green-500";
 
   return (
     <div
@@ -57,14 +68,21 @@ export function SwipeableArticleItem({
     >
       {/* Background revealed during swipe */}
       <div
-        className="absolute inset-0 bg-green-500 flex items-center pl-4"
+        className={`absolute inset-0 ${backgroundClass} flex items-center pl-4`}
         aria-hidden="true"
       >
-        {showCheckmark && (
-          <CheckIcon
-            className="h-6 w-6 text-white transition-opacity duration-150"
-            style={{ opacity: isAnimatingOut ? 1 : checkmarkOpacity }}
-          />
+        {showIcon && (
+          isMarkUnread ? (
+            <ArrowUturnLeftIcon
+              className="h-6 w-6 text-white transition-opacity duration-150"
+              style={{ opacity: isCompleting ? 1 : iconOpacity }}
+            />
+          ) : (
+            <CheckIcon
+              className="h-6 w-6 text-white transition-opacity duration-150"
+              style={{ opacity: isCompleting ? 1 : iconOpacity }}
+            />
+          )
         )}
       </div>
 
@@ -77,11 +95,7 @@ export function SwipeableArticleItem({
         onPointerLeave={onPointerCancel}
         className="relative bg-[var(--background)]"
         style={{
-          transform: isAnimatingOut
-            ? "translateX(100%)"
-            : isSwiping
-              ? `translateX(${swipeOffset}px)`
-              : "translateX(0)",
+          transform: isSwiping ? `translateX(${swipeOffset}px)` : "translateX(0)",
           transition: isSwiping ? "none" : "transform 200ms ease-out",
         }}
       >

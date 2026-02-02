@@ -7,7 +7,7 @@ import {
   getAllFeeds,
   getStarredArticles,
   getArticlesByFeed,
-  markArticleRead,
+  toggleArticleRead,
 } from "@/lib/db-operations";
 import type { Article, Feed } from "@/lib/types";
 import ArticleList from "@/components/ArticleList";
@@ -212,9 +212,9 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedArticles, effectiveShowRead, sessionVersion]);
 
-  // Handle swipe-to-mark-as-read from ArticleList
-  const handleMarkRead = useCallback((articleId: string) => {
-    markArticleRead(articleId);
+  // Handle swipe-to-toggle-read from ArticleList
+  const handleToggleRead = useCallback((articleId: string) => {
+    toggleArticleRead(articleId);
   }, []);
 
   // Detect newly read articles and keep them visible for this session
@@ -348,7 +348,7 @@ function ListPane({ variant, feedId, freezeQuery = false }: ListPaneProps) {
           showFeedName={variant !== "feed"}
           feedNames={feedNames}
           fromPath={listPath}
-          onMarkRead={handleMarkRead}
+          onToggleRead={handleToggleRead}
         />
       )}
 
